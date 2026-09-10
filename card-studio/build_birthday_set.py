@@ -321,7 +321,7 @@ def gallery():
     for tpl, t in TEMPLATES.items():
         tiles.append(f"""
   <div class="tile">
-    <div class="cap"><b>Birthday / {tpl.title()}</b><span>{'明亮开心' if tpl=='celebration' else '温柔浪漫' if tpl=='soft' else '年轻大胆' if tpl=='pop' else '高级安静'}</span></div>
+    <div class="cap"><b>Birthday / {tpl.title()}</b><span>{'明亮开心 · 主力款' if tpl=='celebration' else '温柔浪漫' if tpl=='soft' else '年轻大胆' if tpl=='pop' else '高级安静 · 高级款' if tpl=='night' else '立体画框 · 备选款'}</span></div>
     <iframe src="./{tpl}/?pose=front&embed=1" title="{tpl}"></iframe>
     <div class="links"><a href="./{tpl}/">打开卡片</a><a href="./{tpl}/showcase.html">四态展示</a></div>
   </div>""")
