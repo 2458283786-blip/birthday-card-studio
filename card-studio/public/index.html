@@ -196,6 +196,32 @@ async function poll() {
       b.style.cssText = "padding:5px 12px;font-size:12px;margin-left:auto";
       b.onclick = () => showViewer(j.id, j.title);
       el.querySelector(".row").appendChild(b);
+      if (!j.export || j.export.status === "error") {
+        const e = document.createElement("button");
+        e.className = "btn"; e.textContent = j.export ? "📦 重新导出" : "📦 导出卡牌";
+        e.style.cssText = "padding:5px 12px;font-size:12px";
+        e.onclick = async () => {
+          e.disabled = true; e.textContent = "导出中…";
+          const r = await fetch("/api/export", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: j.id }),
+          });
+          if (!r.ok) { alert("导出失败: " + (await r.text())); e.disabled = false; e.textContent = "📦 导出卡牌"; return; }
+          $("log").style.display = "block";
+          startPoll();
+        };
+        el.querySelector(".row").appendChild(e);
+      } else if (j.export.status === "done") {
+        const a = document.createElement("a");
+        a.className = "btn"; a.textContent = "⬇ 下载卡包";
+        a.href = j.export.url; a.title = j.export.zip;
+        a.style.cssText = "padding:5px 12px;font-size:12px;text-decoration:none;color:#fff";
+        el.querySelector(".row").appendChild(a);
+      } else {
+        const s = document.createElement("span");
+        s.className = "muted"; s.textContent = "导出中…";
+        el.querySelector(".row").appendChild(s);
+      }
     }
     box.appendChild(el);
   });
@@ -208,6 +234,12 @@ async function poll() {
     $("log").textContent = lg.lines.join("\n");
     $("log").scrollTop = $("log").scrollHeight;
     if (active.status === "error") { clearInterval(pollTimer); $("go").disabled = false; }
+  } else if (list.some((j) => j.export && j.export.status === "running")) {
+    const ex = list.find((j) => j.export && j.export.status === "running");
+    $("log").style.display = "block";
+    const lg = await (await fetch("/api/jobs/" + ex.id + "/log")).json();
+    $("log").textContent = lg.lines.join("\n");
+    $("log").scrollTop = $("log").scrollHeight;
   } else if (done) {
     $("log").style.display = "none";
     clearInterval(pollTimer);

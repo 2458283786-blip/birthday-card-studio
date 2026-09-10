@@ -258,6 +258,11 @@ async function init() {
   if (!response.ok) throw Error("作品配置未找到");
   config = await response.json();
   document.title = config.title + " · 白相";
+  // §16 缺少 3D 模型 → 2D/CSS-3D 回退
+  if (!(config.assets && config.assets.model)) {
+    fallback3D(new Error("缺少 3D 模型, 使用 2D 回退"));
+    return;
+  }
   for (const [id, key] of [
     ["card-title", "title"],
     ["subtitle", "subtitle"],
@@ -303,11 +308,26 @@ async function init() {
   stage.append(renderer.domElement);
   renderer.domElement.setAttribute("aria-hidden", "true");
   const textureLoader = new THREE.TextureLoader();
-  const textures = await Promise.all(
-    ["subject", "background", "text"].map((name) =>
-      textureLoader.loadAsync(config.assets[name]),
-    ),
-  );
+  const A = config.assets || {};
+  const blankTex = () => {
+    const t = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+    t.needsUpdate = true;
+    return t;
+  };
+  // §16 缺少分层素材时回退到整张 front.png; 连 front.png 都没有才报错
+  const hasLayers = !!(A.subject && A.background && A.text);
+  let textures;
+  if (hasLayers) {
+    textures = await Promise.all(
+      ["subject", "background", "text"].map((name) => textureLoader.loadAsync(A[name])),
+    );
+  } else if (A.front) {
+    const frontOnly = await textureLoader.loadAsync(A.front);
+    textures = [blankTex(), frontOnly, blankTex()];
+    console.warn("[holo-card] 缺少分层素材, 已回退到 front.png");
+  } else {
+    throw Error("缺少卡面素材: 需要分层图或 front.png");
+  }
   const line = config.assets.lineart
     ? await textureLoader.loadAsync(config.assets.lineart)
     : new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
@@ -484,15 +504,36 @@ function fallback3D(error) {
     if (name === "lineart") layer.style.mixBlendMode = "multiply";
     layers.set(name, { el: layer, z: roleZ[name] });
   }
+  // §16 没有分层但有 front.png 时, 整张正片作为唯一图层
+  if (!layers.size && config?.assets?.front) {
+    const layer = document.createElement("div");
+    layer.className = "layer3d";
+    const img = document.createElement("img");
+    img.src = config.assets.front;
+    img.alt = config.title || "卡片";
+    img.loading = "eager";
+    layer.append(img);
+    front.append(layer);
+    layers.set("front", { el: layer, z: -48 });
+  }
   const foil = document.createElement("div");
   foil.className = "foil3d";
   front.append(foil);
   const back = document.createElement("div");
   back.className = "face3d back3d";
-  const backMark = document.createElement("span");
-  backMark.className = "back-mark";
-  backMark.textContent = "白相";
-  back.append(backMark);
+  if (config?.assets?.back) {
+    const bimg = document.createElement("img");
+    bimg.src = config.assets.back;
+    bimg.alt = "卡片背面";
+    bimg.loading = "eager";
+    bimg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;";
+    back.append(bimg);
+  } else {
+    const backMark = document.createElement("span");
+    backMark.className = "back-mark";
+    backMark.textContent = config.title || "CARD";
+    back.append(backMark);
+  }
   card.append(front, back);
   flipper.append(card);
   wrap.append(flipper);

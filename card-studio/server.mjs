@@ -3,7 +3,7 @@
 import http from "node:http";
 import { spawn } from "node:child_process";
 import { readFile, writeFile, mkdir, readdir, stat, rm } from "node:fs/promises";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +11,7 @@ const __dir = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = __dir;
 const PROJECTS = path.join(ROOT, "projects");
 const PUBLIC = path.join(ROOT, "public");
+const EXPORTS = path.join(ROOT, "..", "exports");
 const SKILL = path.join(ROOT, "..", "RuiC-card-skill-main", "scripts");
 const PORT = Number(process.env.PORT || 4399);
 
@@ -247,9 +248,64 @@ const server = http.createServer(async (req, res) => {
       const list = [...jobs.values()].map((j) => ({
         id: j.id, title: j.meta.title, edition: j.meta.edition, style: j.style,
         status: j.status, created: j.created, last: j.lines.slice(-1)[0] || "",
+        export: j.export || null,
       }));
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(JSON.stringify(list));
+    }
+
+    // ---- 导出卡牌(Card Package + 单文件 Showcase) ----
+    if (req.method === "POST" && p === "/api/export") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const job = jobs.get(String(raw.id || ""));
+      if (!job) { res.writeHead(404); return res.end("no job"); }
+      if (!existsSync(path.join(job.dir, "web"))) {
+        res.writeHead(400); return res.end("这张卡还没生成完成(缺 web 目录)");
+      }
+      if (job.export && job.export.status === "running") {
+        res.writeHead(409); return res.end("正在导出中");
+      }
+      job.export = { status: "running", zip: null, url: null };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      (async () => {
+        const logPath = path.join(job.dir, "export.log");
+        try { await rm(logPath, { force: true }); } catch {}
+        await mkdir(EXPORTS, { recursive: true }).catch(() => {});
+        const digits = (String(job.meta.edition || "").match(/\d+/) || ["1"])[0]
+          .slice(-4).padStart(4, "0");
+        const args = [process.env.PY || "python", "-u", path.join(__dir, "export_package.py"),
+                      job.dir, "--out", EXPORTS, "--card-id", "CARD-" + digits];
+        job.lines.push("[工坊] 开始导出 Card Package…");
+        const code = await runPy(args, ROOT, logPath, (l) => job.lines.push(l));
+        let zip = null;
+        try {
+          const files = readdirSync(EXPORTS).filter((f) => f.toLowerCase().endsWith(".zip"));
+          const withTime = files.map((f) => ({ f, t: statSync(path.join(EXPORTS, f)).mtimeMs }));
+          withTime.sort((a, b) => b.t - a.t);
+          zip = withTime.length ? withTime[0].f : null;
+        } catch {}
+        if (code === 0 && zip) {
+          job.export = { status: "done", zip, url: "/exports/" + encodeURIComponent(zip) };
+          job.lines.push("[工坊] ✅ 导出完成: " + zip);
+        } else {
+          job.export = { status: "error", zip: null, url: null };
+          job.lines.push("[工坊] ⚠ 导出失败(见上方输出)");
+        }
+      })();
+      return;
+    }
+
+    if (req.method === "GET" && p.startsWith("/exports/")) {
+      const name = decodeURIComponent(p.slice("/exports/".length));
+      const file = path.join(EXPORTS, name);
+      if (!file.startsWith(EXPORTS) || !existsSync(file)) { res.writeHead(404); return res.end("not found"); }
+      const data = await readFile(file);
+      res.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Disposition": 'attachment; filename="' + name.replace(/"/g, "") + '"',
+      });
+      return res.end(data);
     }
 
     const logM = p.match(/^\/api\/jobs\/([a-z0-9-]+)\/log$/);
