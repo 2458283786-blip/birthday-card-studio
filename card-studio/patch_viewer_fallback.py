@@ -163,7 +163,12 @@ def targets():
             f = base / "web" / n
             if f.exists():
                 out.append(f)
-    for d in ("birthday-set", "birthday-build", "card-studio/projects"):
+    for sub in (ROOT / "birthday-set").glob("*"):        # 成品目录本身即 web
+        for n in ("app.js", "app.bundle.js"):
+            f = sub / n
+            if f.exists():
+                out.append(f)
+    for d in ("birthday-build", "card-studio/projects"):
         for sub in (ROOT / d).glob("*"):
             for n in ("app.js", "app.bundle.js"):
                 f = sub / "web" / n

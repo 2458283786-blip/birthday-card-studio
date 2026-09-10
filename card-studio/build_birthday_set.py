@@ -414,6 +414,14 @@ def build_one(tpl, t, photo):
             s = s.replace(old, ".74 + .17 * cos(6.28318 * (phase + vec3(0., .33, .67)))")
         p.write_text(s, encoding="utf8")
 
+    # 用 esbuild 从 app.js 重建 app.bundle.js, 保证页面跑的就是我们改过的 shader
+    try:
+        import rebuild_bundles
+        rebuild_bundles.build(web)
+        log(f"{tpl} bundle 已重建")
+    except Exception as e:
+        log(f"{tpl} bundle 重建跳过({type(e).__name__})")
+
     dst = SET / tpl
     if dst.exists():
         shutil.rmtree(dst)
