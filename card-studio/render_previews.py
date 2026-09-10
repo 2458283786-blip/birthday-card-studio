@@ -232,28 +232,23 @@ def render_back(tpl, cfg):
     d.line([(538, 940), (632, 940)], fill=S["ink"] + (70,), width=1)
     if cfg.get("tagline"):
         tracked(d, (512, 982), cfg["tagline"], f(SANS, 16), S["ink"] + (160,), 5.5, True)
-    d.line([(372, 1132), (652, 1132)], fill=S["ink"] + (60,), width=1)
-    tracked(d, (512, 1150), "CARD NAME", f(SANS, 12), S["ink"] + (150,), 3.2, True)
+    # 收藏凭证区: Card ID 已在顶部; 其余字段有数据才显示(不留占位)
+    d.line([(372, 1104), (652, 1104)], fill=S["ink"] + (60,), width=1)
     if cfg.get("name"):
-        tracked(d, (512, 1180), cfg["name"], f(SANS, 17), ink, 1.0, True)
-    else:
-        d.line([(412, 1176), (612, 1176)], fill=S["ink"] + (60,), width=1)
+        tracked(d, (512, 1150), "FOR " + str(cfg["name"]).upper(), f(SANS, 16), ink, 4.0, True)
     if cfg.get("technique"):
-        tracked(d, (512, 1236), cfg["technique"], f(SANS, 22), gold, 2.0, True)
+        tracked(d, (512, 1206), cfg["technique"], f(SANS, 22), gold, 2.0, True)
     if cfg.get("wish"):
-        tracked(d, (512, 1278), cfg["wish"], f(SERIF, 21), S["ink"] + (190,), 0.6, True)
-    if cfg.get("name"):
-        tracked(d, (512, 1316), "FOR " + str(cfg["name"]).upper(), f(SANS, 16), ink, 4.0, True)
+        tracked(d, (512, 1258), cfg["wish"], f(SERIF, 21), S["ink"] + (190,), 0.6, True)
 
     def field(label, y, value):
+        if not value:
+            return
         tracked(d, (512, y), label, f(SANS, 12), S["ink"] + (150,), 3.2, True)
-        if value:
-            tracked(d, (512, y + 30), value, f(SANS, 17), ink, 1.0, True)
-        else:
-            d.line([(412, y + 26), (612, y + 26)], fill=S["ink"] + (60,), width=1)
+        tracked(d, (512, y + 30), value, f(SANS, 17), ink, 1.0, True)
 
-    field("CREATED BY", 1356, cfg.get("createdBy") or "")
-    field("OWNED BY", 1432, cfg.get("ownedBy") or "")
+    field("CREATED BY", 1330, cfg.get("createdBy") or "")
+    field("OWNED BY", 1396, cfg.get("ownedBy") or "")
     return im.convert("RGB")
 
 

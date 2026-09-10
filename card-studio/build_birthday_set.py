@@ -139,13 +139,10 @@ BACK_JS = r'''function backTexture() {
     let x = cx - w / 2;
     for (const ch of chars) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + tracking; }
   };
-  const field = (label, y, value) => {
+  const field = (label, y, value) => {          // 没数据 → 完全不显示(不留占位线)
+    if (!value) return;
     tracked(label, 512, y, "12px 'Segoe UI', Arial", 3.2, "rgba(" + (S.frame === "bold" ? "20,20,20,.62" : "139,132,116,.92") + ")");
-    if (value) tracked(value, 512, y + 30, "17px 'Segoe UI', Arial", 1, "rgba(" + (dark ? "232,217,181,.94" : "58,52,44,.9") + ")");
-    else {
-      ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.22" : "58,52,44,.25") + ")";
-      ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(412, y + 26); ctx.lineTo(612, y + 26); ctx.stroke();
-    }
+    tracked(value, 512, y + 30, "17px 'Segoe UI', Arial", 1, "rgba(" + (dark ? "232,217,181,.94" : "58,52,44,.9") + ")");
   };
   const g = ctx.createLinearGradient(0, 0, 0, 1536);
   g.addColorStop(0, S.bg1); g.addColorStop(1, S.bg2);
@@ -215,14 +212,13 @@ BACK_JS = r'''function backTexture() {
   if (config.tagline) tracked(config.tagline, 512, 982, "16px 'Segoe UI', Arial", 5.5, "rgba(" + (dark ? "222,201,160,.6" : "58,52,44,.62") + ")");
   // 收藏凭证区
   ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.28" : "58,52,44,.22") + ")";
-  ctx.beginPath(); ctx.moveTo(372, 1132); ctx.lineTo(652, 1132); ctx.stroke();
-  field("CARD NAME", 1150, config.name || "");
-  if (config.technique) tracked(config.technique, 512, 1236, "22px 'Segoe UI', Arial", 2, goldC);
-  if (config.wish) tracked(config.wish, 512, 1278, "italic 21px Palatino Linotype, Georgia, serif", 0.6,
+  ctx.beginPath(); ctx.moveTo(372, 1104); ctx.lineTo(652, 1104); ctx.stroke();
+  if (config.name) tracked("FOR " + String(config.name).toUpperCase(), 512, 1150, "16px 'Segoe UI', Arial", 4, inkC);
+  if (config.technique) tracked(config.technique, 512, 1206, "22px 'Segoe UI', Arial", 2, goldC);
+  if (config.wish) tracked(config.wish, 512, 1258, "italic 21px Palatino Linotype, Georgia, serif", 0.6,
                            "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")");
-  if (config.name) tracked("FOR " + String(config.name).toUpperCase(), 512, 1316, "16px 'Segoe UI', Arial", 4, inkC);
-  field("CREATED BY", 1356, config.createdBy || "");
-  field("OWNED BY", 1432, config.ownedBy || "");
+  field("CREATED BY", 1330, config.createdBy || "");
+  field("OWNED BY", 1396, config.ownedBy || "");
   return canvasTexture(c);
 }
 '''

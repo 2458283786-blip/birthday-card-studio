@@ -532,12 +532,14 @@ def effects(tpl):
 
 # ---------------------------------------------------------------- 排版 + 卡框(最前层)
 def text_layer(tpl, cfg):
+    """文案完全数据驱动: 未提供的字段一律不绘制(不虚构、不占位)。
+    subtitle=小标题 · title=主标题 · tagline=短句 · technique=日期 · edition=编号 · age=年龄 · name=名字。"""
     p = PALETTE[tpl]
-    HB = cfg.get("subtitle") or "HAPPY BIRTHDAY"
-    MAIN = cfg.get("title") or "YOUR DAY"
-    TAG = cfg.get("tagline") or ""
-    DATE = cfg.get("technique") or ""
-    NO = cfg.get("edition") or "CARD #0001"
+    HB = str(cfg.get("subtitle") or "").strip()
+    MAIN = str(cfg.get("title") or "").strip()
+    TAG = str(cfg.get("tagline") or "").strip()
+    DATE = str(cfg.get("technique") or "").strip()
+    NO = str(cfg.get("edition") or "").strip()
     NAME = str(cfg.get("name") or "").strip()
     AGE = str(cfg.get("age") or "").strip()
     YEAR = (DATE.split(".")[0] if DATE else "")
@@ -563,10 +565,10 @@ def text_layer(tpl, cfg):
             aw = d.textlength(AGE, font=f)
             d.text((96 + aw + 10, 1252 - 128), "TH", font=font(SANS_SB, 48), fill=p["c"] + (255,), anchor="ls")
             tracked(d, (100, 1316), MAIN, font(SERIF, 54), p["ink"] + (250,), 4.0)
-        else:
-            f = font(SANS_BLACK, 150)
-            d.text((96, 1252), YEAR or "BIRTHDAY", font=f, fill=p["c"] + (255,), anchor="ls")
-            tracked(d, (100, 1316), "BIRTHDAY", font(SERIF, 54), p["ink"] + (250,), 6.0)
+        elif MAIN:                      # 未提供年龄 → 用主标题当 hero; 两者都没有就留白
+            tracked(d, (96, 1252), MAIN, font(SERIF, 118), p["ink"] + (250,), 2.0)
+        elif YEAR:
+            tracked(d, (96, 1252), YEAR, font(SANS_BLACK, 132), p["c"] + (255,), 3.0)
         if TAG:
             tracked(d, (104, 1364), TAG, font(SANS, 14), p["ink"] + (200,), 5.0)
         xr = W - 108
@@ -611,9 +613,12 @@ def text_layer(tpl, cfg):
             aw = d.textlength(AGE, font=f)
             d.text((76 + aw + 8, 1240 - 168), "TH", font=font(SANS_BLACK, 62), fill=p["c"] + (255,), anchor="ls")
             tracked(d, (82, 1300), MAIN, font(SANS_BLACK, 38), p["ink"] + (255,), 6.0)
-        else:
-            tracked(d, (76, 1240), "BIRTHDAY", font(SANS_BLACK, 116), p["ink"] + (255,), 2.0)
-            tracked(d, (80, 1300), YEAR or MAIN, font(SANS_BLACK, 54), p["c"] + (255,), 4.0)
+        elif MAIN:                      # 无年龄: 主标题当字标; 只有日期就显示年份
+            tracked(d, (76, 1240), MAIN, font(SANS_BLACK, 116), p["ink"] + (255,), 2.0)
+            if YEAR:
+                tracked(d, (80, 1300), YEAR, font(SANS_BLACK, 54), p["c"] + (255,), 4.0)
+        elif YEAR:
+            tracked(d, (76, 1240), YEAR, font(SANS_BLACK, 116), p["ink"] + (255,), 2.0)
         if NAME:
             tracked(d, (84, 1352), f"FOR {NAME.upper()}", font(SANS_SB, 20), p["ink"] + (235,), 3.0)
         xr = W - 80

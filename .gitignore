@@ -5,6 +5,7 @@ tools/
 # ---- 运行期 / 中间产物 ----
 card-studio/projects/
 birthday-build/
+exports/
 _video-frames/
 *.part
 *.log
