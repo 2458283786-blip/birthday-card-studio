@@ -51,6 +51,7 @@ def build_card_json(project, card_id, internal_id=None, theme="birthday", templa
     tpl = template or cfg.get("backStyle") or "night"
     params = cfg.get("parameters", {}) or {}
     finish = (cfg.get("appearance") or {}).get("finish") or "pearl"
+    mat = cfg.get("material") or {}
     canonical = str(card_id).strip().replace("#", "").replace(" ", "-").upper()
     if not canonical.startswith("CARD-"):
         canonical = "CARD-" + canonical
@@ -92,9 +93,12 @@ def build_card_json(project, card_id, internal_id=None, theme="birthday", templa
             "frame": None,
         },
         "material": {
-            "type": _finish_to_material(finish),
-            "holoEnabled": finish != "original",
+            # type = 主材质(取边框区域材质, 缺省回落到 finish 映射)
+            "type": ((mat.get("regions") or {}).get("frame") if mat else None) or _finish_to_material(finish),
+            "holoEnabled": mat.get("holoEnabled", finish != "original"),
             "foil": params.get("foil"),
+            "regions": mat.get("regions") or {},
+            "amounts": mat.get("amounts") or {},
         },
         "interaction": {"parallax": True, "flip": has_back, "holo": finish != "original"},
         "media": {"type": "image", "src": "front.png", "poster": "preview/front.jpg"},

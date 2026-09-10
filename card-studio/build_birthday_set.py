@@ -30,24 +30,34 @@ TEMPLATES = {
     "celebration": dict(
         theme="light", page_bg="#fbf6ec", ink="#3a342c", accent="#e8796a",
         params=dict(subjectScale=1.0, subjectDepth=0.32, backgroundDepth=-0.26,
-                    effectsDepth=0.58, effectsScale=1.04, foil=0.50)),
+                    effectsDepth=0.58, effectsScale=1.04, foil=0.50),
+        material=dict(regions=dict(frame="pearl", text="matte", subject="matte", background="pearl"),
+                      amounts=dict(frame=0.45, subject=0.0, background=0.28))),
     "soft": dict(
         theme="light", page_bg="#f7f2ea", ink="#5b5248", accent="#c8a97e",
         params=dict(subjectScale=1.0, subjectDepth=0.30, backgroundDepth=-0.24,
-                    effectsDepth=0.55, effectsScale=1.03, foil=0.38)),
+                    effectsDepth=0.55, effectsScale=1.03, foil=0.38),
+        material=dict(regions=dict(frame="pearl", text="matte", subject="matte", background="pearl"),
+                      amounts=dict(frame=0.35, subject=0.0, background=0.22))),
     "pop": dict(
         theme="light", page_bg="#fffdf6", ink="#141414", accent="#2b4cff",
         params=dict(subjectScale=1.0, subjectDepth=0.36, backgroundDepth=-0.30,
-                    effectsDepth=0.66, effectsScale=1.06, foil=0.60)),
+                    effectsDepth=0.66, effectsScale=1.06, foil=0.60),
+        material=dict(regions=dict(frame="gloss", text="gloss", subject="matte", background="matte"),
+                      amounts=dict(frame=0.5, text=0.4, subject=0.0, background=0.0))),
     "night": dict(
         theme="dark", page_bg="#080c16", ink="#f0e8d6", accent="#dec9a0",
         params=dict(subjectScale=1.0, subjectDepth=0.34, backgroundDepth=-0.30,
-                    effectsDepth=0.62, effectsScale=1.05, foil=0.52)),
+                    effectsDepth=0.62, effectsScale=1.05, foil=0.52),
+        material=dict(regions=dict(frame="pearl", text="matte", subject="pearl", background="pearl"),
+                      amounts=dict(frame=0.5, subject=0.35, background=0.35))),
     # 立体画框: 大层距 + 暖金箔光扫 + 浮雕投影
     "diorama": dict(
         theme="dark", page_bg="#06090f", ink="#f2e8d5", accent="#e8c98a", finish="gold",
         params=dict(subjectScale=1.0, subjectDepth=0.55, backgroundDepth=-0.34,
-                    effectsDepth=0.88, effectsScale=1.06, foil=0.88)),
+                    effectsDepth=0.88, effectsScale=1.06, foil=0.88),
+        material=dict(regions=dict(frame="foil", text="foil", subject="matte", background="pearl"),
+                      amounts=dict(frame=0.95, text=0.7, subject=0.0, background=0.4))),
 }
 
 BASE_CFG = {
@@ -376,6 +386,7 @@ def build_one(tpl, t, photo):
         "appearance": {"finish": t.get("finish", "pearl"), "background": t["page_bg"]},
         "backStyle": tpl,
         "parameters": t["params"],
+        "material": t.get("material", {}),
         "safeArea": {"scale": 1.0, "offset": [0.0, 0.0]},
     })
     (proj / "card-config.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf8")

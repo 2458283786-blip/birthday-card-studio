@@ -110,6 +110,68 @@ def hash2(x, y):
     return v - np.floor(v)
 
 
+# ---------------------------------------------------------------- 材质系统(与 shader 同步)
+MAT_INDEX = {"matte": 0, "pearl": 1, "foil": 2, "gloss": 3}
+
+
+def material_setup(cfg):
+    """返回 (types[frame,text,subject,bg], amounts[...], holoOn) —— 与 app.js 推导逻辑一致。"""
+    p = cfg.get("parameters", {}) or {}
+    mat = cfg.get("material", {}) or {}
+    finish = str((cfg.get("appearance") or {}).get("finish") or "").lower()
+    holo_on = mat.get("holoEnabled", True) is not False and finish != "original"
+    regions = mat.get("regions", {}) or {}
+    amounts = mat.get("amounts", {}) or {}
+    foil_base = float(p.get("foil", 0.52))
+
+    def t_of(k, d):
+        return MAT_INDEX.get(str(regions.get(k) or d).lower(), MAT_INDEX[d])
+
+    def a_of(k, d):
+        return float(amounts[k]) if (k in amounts and amounts[k] is not None) else (0.0 if d == "text" else foil_base)
+
+    types = [t_of("frame", "pearl"), t_of("text", "matte"), t_of("subject", "pearl"), t_of("background", "pearl")]
+    amts = [a_of("frame", "frame"), a_of("text", "text"), a_of("subject", "subject"), a_of("background", "background")]
+    if not holo_on:
+        amts = [0.0, 0.0, 0.0, 0.0]
+    return types, amts, holo_on
+
+
+def pearl_film(u, v, view):
+    phase = u * 0.85 + v * 0.55 + view[0] * 1.5 - view[1] * 0.9
+    return 0.74 + 0.17 * np.cos(6.28318 * (phase[..., None] + np.array([0.0, 0.33, 0.67])))
+
+
+def foil_film(u, v, view):
+    phase = u * 0.62 + v * 0.38 + view[0] * 2.2 - view[1] * 1.3
+    hi = 0.5 + 0.5 * np.sin(phase * 6.28318 * 1.6)
+    return np.array([0.62, 0.46, 0.22]) * (1 - hi[..., None]) + np.array([1.0, 0.94, 0.72]) * hi[..., None]
+
+
+def gloss_film(u, v, view):
+    phase = u * 0.35 + v * 1.15 + view[1] * 1.4
+    s = np.power(0.5 + 0.5 * np.sin(phase * 6.28318), 1.6)
+    return np.array([0.84, 0.87, 0.90]) * (1 - s[..., None]) + 1.0 * s[..., None]
+
+
+def style_film(u, v, view, mtype):
+    if mtype > 2.5:
+        return gloss_film(u, v, view)
+    if mtype > 1.5:
+        return foil_film(u, v, view)
+    return pearl_film(u, v, view)
+
+
+def apply_mat(col, u, v, view, mtype, amount, band, boost):
+    if amount <= 0.001:
+        return col
+    f = style_film(u, v, view, mtype)
+    lum = col[..., 0] * 0.2126 + col[..., 1] * 0.7152 + col[..., 2] * 0.0722
+    col = col * (1.0 - amount * 0.11 * (1.0 - f) * (0.2 + band[..., None] * 0.8))
+    col = col + f * (amount * band * boost * (0.028 + 0.06 * (1.0 - lum)))[..., None]
+    return col
+
+
 def compose_front(tpl, cfg, rx, ry, foil_override):
     """复刻 frontFragment 的合成顺序。"""
     A = SET / tpl / "assets"
@@ -135,32 +197,46 @@ def compose_front(tpl, cfg, rx, ry, foil_override):
     ea = e[..., 3:4] / 255.0
     col = col * (1 - ea) + (e[..., :3] / 255.0) * ea
 
-    # ---- Holo(与 shader 相同公式) ----
+    # ---- 分区材质(边框 / 文字 / 主体 / 底纹), 与 app.js 的 shader 同步 ----
     ys, xs = np.mgrid[0:h, 0:w]
     u = xs / (w - 1)
     v = ys / (h - 1)
-    phase = u * 0.85 + v * 0.55 + view[0] * 1.5 - view[1] * 0.9
-    spec = 0.74 + 0.17 * np.cos(6.28318 * (phase[..., None] + np.array([0.0, 0.33, 0.67])))
+    types, amts, holo_on = material_setup(cfg)
+    if foil_override is not None and holo_on:            # 预览用的临时提亮
+        amts = [float(foil_override) if a > 0 else 0.0 for a in amts]
+    gate = float(np.clip((np.hypot(view[0], view[1]) - 0.12) * 3.2, 0, 1))
+    gate = 0.15 + 0.85 * gate
     band = np.power(0.5 + 0.5 * np.sin((u * 0.72 + v * 0.45 + view[0] * 1.2 + view[1] * 0.6) * 6.283), 10.0)
-    lum = col[..., 0] * 0.2126 + col[..., 1] * 0.7152 + col[..., 2] * 0.0722
-    col = col * (1.0 - amount * 0.11 * (1.0 - spec) * (0.2 + band[..., None] * 0.8))
-    col = col + spec * (amount * band * (0.028 + 0.06 * (1.0 - lum)))[..., None]
     edge = 1.0 - smoothstep(0.015, 0.06, np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v)))
-    col = col * (1 - (edge * amount * 0.16)[..., None]) + (spec * 0.75 + 0.21) * (edge * amount * 0.16)[..., None]
+    t = sample(tx, 0, 0, clip_alpha=False)
+    ta = t[..., 3:4] / 255.0
+    boost = 1.7 if str((cfg.get("appearance") or {}).get("finish", "")).lower() == "gold" else 1.0
+    w_frame = np.clip(edge, 0, 1)
+    w_text = np.clip(ta[..., 0], 0, 1) * (1 - w_frame)
+    w_sub = np.clip(sa[..., 0], 0, 1) * (1 - w_frame) * (1 - w_text)
+    w_bg = np.clip(1 - w_frame - w_text - w_sub, 0, 1)
+    c_sub = apply_mat(col, u, v, view, types[2], amts[2] * gate, band, boost)
+    c_bg = apply_mat(col, u, v, view, types[3], amts[3] * gate, band, boost)
+    col = (c_sub * w_sub[..., None] + c_bg * w_bg[..., None]
+           + col * (w_frame + w_text)[..., None])
+    a_frame = min(max(amts[0], 0.0), 1.0) * gate
+    f_frame = style_film(u, v, view, types[0])
+    col = col * (1 - (w_frame * a_frame)[..., None]) + (f_frame * 0.75 + 0.21) * (w_frame * a_frame)[..., None]
+    spark = max(amts) * gate
     cell = np.floor(np.stack([u * 480.0, v * 720.0], axis=-1))
     fl = (hash2(cell[..., 0], cell[..., 1]) > 0.9975) * np.power(
         0.5 + 0.5 * np.sin(hash2(cell[..., 0] + 8, cell[..., 1]) * 30 + view[0] * 20), 10.0)
-    col = col + spec * (fl * amount * 0.08)[..., None]
+    col = col + style_film(u, v, view, types[0]) * (fl * spark)[..., None] * 0.08
 
     # 线稿辉光(以主体 UV 采样, 与 shader 一致)
     ls = sample(ln[..., :1] / 255.0, *parallax_shift(view, p.get("subjectDepth", 0.32)), clip_alpha=False)
     line = (1.0 - smoothstep(0.06, 0.25, ls[..., 0]))
-    col = col + (line * sa[..., 0] * band * amount * 0.035)[..., None]
+    col = col + (line * sa[..., 0] * band * spark * 0.035)[..., None]
 
-    # 文字层最后叠加(不参与 Holo)
-    t = sample(tx, 0, 0, clip_alpha=False)
-    ta = t[..., 3:4] / 255.0
-    col = col * (1 - ta) + (t[..., :3] / 255.0) * ta
+    # 文字: 只要有文字就合成; 材质强度为 0 时 apply_mat 原样返回(等同哑光)
+    if w_text.max() > 0.001:
+        c_text = apply_mat(t[..., :3] / 255.0, u, v, view, types[1], amts[1] * gate, band, boost)
+        col = col * (1 - w_text[..., None]) + c_text * w_text[..., None]
     return np.clip(col, 0, 1)
 
 

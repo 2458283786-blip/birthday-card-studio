@@ -46,6 +46,8 @@ precision highp float;
 varying vec2 vUv;
 uniform float uTime, uFoil, uScale, uDepth, uBgDepth, uFinish, uHasLine, uRelief, uSafeScale, uFxDepth, uHasFx;
 uniform vec2 uFit, uSafeOffset;
+// 分区材质: 0 哑光 / 1 珠光 / 2 金属箔 / 3 亮面
+uniform vec4 uMatType, uMatAmt;
 uniform vec3 uView;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 float inside(vec2 p) { return step(0.,p.x)*step(0.,p.y)*step(p.x,1.)*step(p.y,1.); }
@@ -73,6 +75,34 @@ vec3 film(vec2 uv) {
 float sweep(vec2 uv) {
   return pow(.5+.5*sin((uv.x*.72+uv.y*.45+uView.x*1.2+uView.y*.6)*6.283),10.);
 }
+vec3 pearlFilm(vec2 uv) {
+  float phase = uv.x*.85 + uv.y*.55 + uView.x*1.5 - uView.y*.9;
+  return .74 + .17*cos(6.28318*(phase + vec3(0.,.33,.67)));
+}
+vec3 foilFilm(vec2 uv) {
+  float phase = uv.x*.62 + uv.y*.38 + uView.x*2.2 - uView.y*1.3;
+  float hi = .5+.5*sin(phase*6.28318*1.6);
+  return mix(vec3(.62,.46,.22), vec3(1.,.94,.72), hi);
+}
+vec3 glossFilm(vec2 uv) {
+  float phase = uv.x*.35 + uv.y*1.15 + uView.y*1.4;
+  float s = pow(.5+.5*sin(phase*6.28318), 1.6);
+  return mix(vec3(.84,.87,.90), vec3(1.), s);
+}
+vec3 styleFilm(vec2 uv, float type) {
+  if (type > 2.5) return glossFilm(uv);
+  if (type > 1.5) return foilFilm(uv);
+  return pearlFilm(uv);
+}
+// 单个区域施加材质(amount=0 即哑光, 原样返回)
+vec3 applyMat(vec3 col, vec2 uv, float type, float amount, float band, float boost) {
+  if (amount <= 0.001) return col;
+  vec3 f = styleFilm(uv, type);
+  float lum = dot(col, vec3(.2126,.7152,.0722));
+  col *= 1. - amount*.11*(1.-f)*(.2+band*.8);
+  col += f*amount*band*boost*(.028+.06*(1.-lum));
+  return col;
+}
 `;
 const frontFragment =
   common +
@@ -92,24 +122,37 @@ void main() {
   vec2 eu = parallax(uv,uFxDepth);
   vec4 fx = texture2D(tEffects,clamp(eu,0.,1.));
   col = mix(col,fx.rgb,fx.a*(1.-uRelief)*uHasFx);
-  vec3 foil = film(uv);
+  // ---- 分区材质(边框 / 文字 / 主体 / 底纹) ----
   float tilt = clamp((length(uView.xy) - 0.12) * 3.2, 0.0, 1.0);
-  float amount = strength() * mix(0.15, 1.0, tilt);
-  float luminance = dot(col,vec3(.2126,.7152,.0722));
+  float gate = mix(0.15, 1.0, tilt);
   float band = sweep(uv);
-  // Laminate changes with the card-local viewing direction; black print stays readable.
   float goldBoost = uFinish > 2.5 ? 1.7 : 1.0;
-  col *= 1. - amount * .11 * (1.-foil) * (.2 + band*.8);
-  col += foil * amount * band * goldBoost * (.028 + .06*(1.-luminance));
   float edge = 1.-smoothstep(.015,.06,min(min(uv.x,1.-uv.x),min(uv.y,1.-uv.y)));
-  col = mix(col,foil*.75+.21,edge*amount*(uFinish > 2.5 ? .22 : .16));
+  vec4 text = texture2D(tText,uv);
+  float wFrame = clamp(edge,0.,1.);
+  float wText = clamp(text.a*(1.-uRelief),0.,1.)*(1.-wFrame);
+  float wSub = clamp(subject.a,0.,1.)*(1.-wFrame)*(1.-wText);
+  float wBg = clamp(1.-wFrame-wText-wSub,0.,1.);
+  // 主体 / 底纹: 先按各自材质处理表面色
+  vec3 cSub = applyMat(col, uv, uMatType.z, uMatAmt.z*gate, band, goldBoost);
+  vec3 cBg = applyMat(col, uv, uMatType.w, uMatAmt.w*gate, band, goldBoost);
+  col = cSub*wSub + cBg*wBg + col*(wFrame+wText);
+  // 边框: 材质 + 边缘高光
+  float aFrame = clamp(uMatAmt.x,0.,1.)*gate;
+  vec3 fFrame = styleFilm(uv, uMatType.x);
+  col = mix(col, fFrame*.75+.21, wFrame*aFrame*(uFinish > 2.5 ? .34 : .26));
+  // sparkle / 线稿辉光: 用各区域里的最大强度
+  float sparkAmt = max(max(uMatAmt.x,uMatAmt.y), max(uMatAmt.z,uMatAmt.w))*gate;
   vec2 cell = floor(uv*vec2(480.,720.));
   float flake = step(.9975,hash(cell))*pow(.5+.5*sin(hash(cell+8.)*30.+uView.x*20.+uTime*.6),10.);
-  col += foil*flake*amount*.08;
+  col += styleFilm(uv,uMatType.x)*flake*sparkAmt*.08;
   float line = (1.-smoothstep(.06,.25,texture2D(tLine,clamp(su,0.,1.)).r))*uHasLine;
-  col += line*inside(su)*subject.a*band*amount*.035;
-  vec4 text = texture2D(tText,uv);
-  col = mix(col,text.rgb,text.a*(1.-uRelief));
+  col += line*inside(su)*subject.a*band*sparkAmt*.035;
+  // 文字: 自己的材质(可做烫金字)
+  if (wText > 0.001) {
+    vec3 cText = applyMat(text.rgb, uv, uMatType.y, uMatAmt.y*gate, band, goldBoost);
+    col = mix(col, cText, wText);
+  }
   gl_FragColor = vec4(pow(clamp(col,0.,1.),vec3(2.2)),1.);
   #include <colorspace_fragment>
 }
@@ -118,7 +161,7 @@ const edgeFragment =
   common +
   `
 void main() {
-  vec3 col = mix(vec3(.66,.69,.67),film(vUv)*.6+.35,strength()*.7);
+  vec3 col = mix(vec3(.66,.69,.67),styleFilm(vUv,uMatType.x)*.6+.35,clamp(uMatAmt.x,0.,1.)*.7);
   gl_FragColor=vec4(pow(col,vec3(2.2)),1.);
   #include <colorspace_fragment>
 }
@@ -345,6 +388,20 @@ async function init() {
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   });
   const p = config.parameters || {};
+  // 材质系统: 四区域(边框/文字/主体/底纹) × 四种材质
+  const MAT_INDEX = { matte: 0, pearl: 1, foil: 2, gloss: 3 };
+  const matCfg = config.material || {};
+  const holoOn = matCfg.holoEnabled !== false &&
+    String((config.appearance || {}).finish || "").toLowerCase() !== "original";
+  const matRegion = matCfg.regions || {};
+  const matAmount = matCfg.amounts || {};
+  const foilBase = p.foil ?? 0.52;
+  const matTypeOf = (k, d) => MAT_INDEX[String(matRegion[k] || d).toLowerCase()] ?? MAT_INDEX[d];
+  const matAmtOf = (k, d) => (holoOn ? (matAmount[k] ?? (d === "text" ? 0 : foilBase)) : 0);
+  const matType = [matTypeOf("frame", "pearl"), matTypeOf("text", "matte"),
+                   matTypeOf("subject", "pearl"), matTypeOf("background", "pearl")];
+  const matAmt = [matAmtOf("frame", "frame"), matAmtOf("text", "text"),
+                  matAmtOf("subject", "subject"), matAmtOf("background", "background")];
   const imageAspect = textures[0].image.width / textures[0].image.height;
   const fit =
     config.artworkFit ||
@@ -365,6 +422,8 @@ async function init() {
     uView: { value: new THREE.Vector3(0, 0, 1) },
     uFit: { value: new THREE.Vector2(...fit) },
     uFoil: { value: p.foil ?? 0.52 },
+    uMatType: { value: new THREE.Vector4(matType[0], matType[1], matType[2], matType[3]) },
+    uMatAmt: { value: new THREE.Vector4(matAmt[0], matAmt[1], matAmt[2], matAmt[3]) },
     uScale: { value: p.subjectScale ?? 1 },
     uDepth: { value: p.subjectDepth ?? 0.32 },
     uBgDepth: { value: p.backgroundDepth ?? -0.18 },

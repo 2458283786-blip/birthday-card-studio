@@ -1,0 +1,12 @@
+① Material System: 四材质 × 四区域
+
+材质: 0 哑光 Matte / 1 珠光 Pearl / 2 金属箔 Foil / 3 亮面 Gloss
+区域: 边框 / 文字 / 主体 / 底纹(逐像素权重, 保留视角门控)
+
+- app.js: 新增 uMatType/uMatAmt 两个 vec4 uniform, 以及 pearl/foil/gloss 三种 film 与 applyMat
+  frontFragment 改为分区施加材质; 文字层可单独上材质(支持烫金字); 卡边 edgeFragment 跟随边框材质
+- card-config.json: material.{regions, amounts, holoEnabled}; 未配置时默认等于现有观感(向后兼容)
+- 五套模板材质: Celebration/Soft 珍珠边框+哑光照片; Pop 亮面边框与字; Night 珍珠分区; Diorama 金箔边框+金箔字+哑光照片
+- render_previews.py 同步镜像材质数学(离线效果图与网页一致), 并修复材质强度为 0 时文字丢失的镜像 bug
+- 新增 card-studio/patch_material_system.py(幂等) 与 card-studio/material_compare.py(四材质对比图)
+- card_schema.py: card.json 的 material 增加 regions/amounts, type 取边框材质
