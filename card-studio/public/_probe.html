@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>probe</title></head>
+<body style="margin:0">
+<div id="out" style="font:12px monospace;white-space:pre-wrap;background:#fff"></div>
+<iframe id="f" src="/p/card-mtss5ijz/" style="width:900px;height:640px;border:0"></iframe>
+<script>
+const f = document.getElementById("f");
+f.onload = () => setTimeout(run, 3600);
+function run() {
+  try {
+    const d = f.contentDocument;
+    const out = ["PROBE_RESULT"];
+    const btns = [...d.querySelectorAll(".tools .icon-button")].slice(0, 4);
+    out.push("title=" + d.title + "  iframe=" + f.clientWidth + "x" + Math.round(f.clientHeight));
+    for (const b of btns) {
+      const r = b.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const top = d.elementFromPoint(cx, cy);
+      const topName = top ? (top.tagName + "." + (top.className || "") + "#" + (top.id || "")) : "NONE";
+      out.push(`btn[${b.title || "?"}] rect=${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}  top=${topName}`);
+    }
+    const tool = d.querySelector(".tools");
+    if (tool) {
+      const tr = tool.getBoundingClientRect();
+      for (const el of d.querySelectorAll("*")) {
+        const er = el.getBoundingClientRect();
+        const ov = !(er.right < tr.left || er.left > tr.right || er.bottom < tr.top || er.top > tr.bottom);
+        if (ov && el !== tool && !tool.contains(el) && er.width > 16 && er.height > 8) {
+          out.push(`OVERLAP ${el.tagName}.${(el.className || "")}#${el.id || ""} rect=${Math.round(er.left)},${Math.round(er.top)} ${Math.round(er.width)}x${Math.round(er.height)}`);
+        }
+      }
+    }
+    out.push("PROBE_END");
+    document.getElementById("out").textContent = out.join("\n");
+    document.title = "PROBE_DONE";
+  } catch (e) {
+    document.getElementById("out").textContent = "PROBE_ERROR " + e;
+    document.title = "PROBE_ERR";
+  }
+}
+</script>
+</body>
+</html>

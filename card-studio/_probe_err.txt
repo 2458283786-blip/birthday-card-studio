@@ -1,0 +1,7 @@
+[0908/225732.087:ERROR:third_party\crashpad\crashpad\client\crashpad_client_win.cc:441] OpenProcess: 拒绝访问。 (0x5)
+[28156:13656:0908/225732.355:FATAL:mojo\public\cpp\platform\platform_channel.cc:183] Check failed: . : 拒绝访问。 (0x5)
+[28156:5088:0908/225732.373:ERROR:chrome\installer\util\google_update_settings_win.cc:544] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set usagestats; result: 5
+[0908/225732.381:ERROR:third_party\crashpad\crashpad\client\crashpad_client_win.cc:154] crash server failed to launch
+[28156:5088:0908/225732.407:ERROR:chrome\installer\util\google_update_settings_win.cc:587] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set urlstats; result: 5
+[28156:18456:0908/225732.465:ERROR:content\browser\network_sandbox.cc:410] Failed to grant sandbox access to cache directory C:\Users\Lenovo\AppData\Local\Temp\dsh-6FFE1j\edgeprof\Default\Cache\Cache_Data: 拒绝访问。 (0x5)
+[28156:18456:0908/225732.524:ERROR:content\browser\network_sandbox.cc:335] Failed to grant sandbox access to SharedDictionary directory C:\Users\Lenovo\AppData\Local\Temp\dsh-6FFE1j\edgeprof\Default\Shared Dictionary: 拒绝访问。 (0x5)

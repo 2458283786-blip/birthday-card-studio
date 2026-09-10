@@ -1,0 +1,31 @@
+{
+  "title": "锦鲤",
+  "subtitle": "鸿运当头 · FORTUNE KOI",
+  "technique": "鲤跃龙门",
+  "tagline": "逆流而上 · 心之所向",
+  "edition": "NO.001 / 001",
+  "collection": "山水墨韵 · 全息典藏",
+  "description": "红白锦鲤乘墨浪而游，转动画卷，流光随视角而生。",
+  "appearance": {
+    "finish": "gold",
+    "background": "#f3eee2"
+  },
+  "parameters": {
+    "subjectScale": 1.18,
+    "subjectDepth": 0.34,
+    "backgroundDepth": -0.3,
+    "foil": 0.4,
+    "effectsDepth": 0.62,
+    "effectsScale": 1.04
+  },
+  "safeArea": {
+    "scale": 1.12,
+    "offset": [
+      -0.06,
+      -0.085
+    ]
+  },
+  "assets": {
+    "effects": "./assets/effects.png"
+  }
+}

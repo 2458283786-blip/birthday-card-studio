@@ -1,0 +1,20 @@
+# ---- Blender 便携版(1.27GB, 由 RuiC skill 自动下载安装, 不入库) ----
+demo-koi/tools/
+tools/
+
+# ---- 运行期 / 中间产物 ----
+card-studio/projects/
+birthday-build/
+_video-frames/
+*.part
+*.log
+
+# ---- Python / Node ----
+__pycache__/
+*.py[cod]
+node_modules/
+
+# ---- 含真人照片的成品目录(默认不入库) ----
+# 仓库设为 private 且你同意时, 注释掉下面两行即可一并提交:
+demo-birthday/
+birthday-set/
