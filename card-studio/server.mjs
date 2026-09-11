@@ -12,6 +12,8 @@ const ROOT = __dir;
 const PROJECTS = path.join(ROOT, "projects");
 const PUBLIC = path.join(ROOT, "public");
 const EXPORTS = path.join(ROOT, "..", "exports");
+// Birthday 系列五套模板(与 build_birthday_set.TEMPLATES 对应)
+const BIRTHDAY_TEMPLATES = ["celebration", "soft", "pop", "night", "diorama"];
 const SKILL = path.join(ROOT, "..", "RuiC-card-skill-main", "scripts");
 const PORT = Number(process.env.PORT || 4399);
 
@@ -124,40 +126,14 @@ async function processJob(job) {
   await writeFile(metaPath, JSON.stringify(job.meta, null, 2), "utf8");
   const py = process.env.PY || "python";
 
-  if (job.template === "night") {
-    // ---- Birthday / Night 高级款: 静态优先的设计(自带纸张质感/排版/背面规则) ----
-    const cfg = {
-      subtitle: job.meta.subtitle || "HAPPY BIRTHDAY",
-      title: job.meta.title || "",
-      tagline: "",
-      technique: job.meta.technique || "",
-      edition: job.meta.edition || "",
-      wish: job.meta.wish || "",
-      age: job.meta.age || "",
-      name: job.meta.name || "",
-      collection: job.meta.collection || "",
-      description: job.meta.description || "",
-      createdBy: "", ownedBy: "",
-      _provenance: { template: "night", style: job.style, mode: job.mode },
-      backStyle: "night",
-      appearance: { finish: "pearl", background: "#080c16" },
-      material: {
-        holoEnabled: true,
-        regions: { frame: "pearl", text: "matte", subject: "pearl", background: "pearl" },
-        amounts: { frame: 0.5, subject: 0.35, background: 0.35 },
-      },
-      parameters: { subjectScale: 1.0, subjectDepth: 0.34, backgroundDepth: -0.30,
-                    effectsDepth: 0.62, effectsScale: 1.05, foil: 0.52, textDepth: 0.55 },
-      safeArea: { scale: 1.0, offset: [0.0, 0.0] },
-    };
-    await writeFile(path.join(job.dir, "card-config.json"),
-                    JSON.stringify(cfg, null, 2), "utf8");
+  if (BIRTHDAY_TEMPLATES.includes(job.template)) {
+    // ---- Birthday 系列(五套共用一条流程): 配置由 build_card_from_meta.py 依 TEMPLATES 表生成 ----
     let code = await runPy(
-      [py, "-u", path.join(__dir, "birthday_system.py"), job.image, job.dir, "night"],
+      [py, "-u", path.join(__dir, "build_card_from_meta.py"), job.dir, job.image, job.template],
       ROOT, logPath, push);
     if (code !== 0) {
       job.status = "error";
-      job.lines.push("[工坊] Night 高级款素材生成失败(见上方提示)。");
+      job.lines.push("[工坊] " + job.template + " 模板素材生成失败(见上方提示)。");
       return;
     }
     job.lines.push("[工坊] 素材就绪, 生成静态卡面(正片/背面/展示图)…");
@@ -283,7 +259,7 @@ const server = http.createServer(async (req, res) => {
       };
       const style = ["ink", "space", "plain", "blackgold"].includes(raw.style) ? raw.style : "ink";
       const mode = ["auto", "keep", "cut"].includes(raw.mode) ? raw.mode : "auto";
-      const template = ["studio", "night"].includes(raw.template) ? raw.template : "studio";
+      const template = ["studio", ...BIRTHDAY_TEMPLATES].includes(raw.template) ? raw.template : "studio";
       if (!raw.imageData) { res.writeHead(400); return res.end("no image"); }
       const m = /^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/s.exec(raw.imageData);
       if (!m) { res.writeHead(400); return res.end("bad image"); }

@@ -70,9 +70,13 @@
     <label>生成模板</label>
     <div class="styles" id="templates" style="margin-bottom:6px">
       <div class="style on" data-v="studio"><span class="sw" style="background:linear-gradient(135deg,#efe9db,#b8862d)"></span>经典工坊风格</div>
-      <div class="style" data-v="night"><span class="sw" style="background:linear-gradient(135deg,#0b101c,#dec9a0)"></span>Birthday / Night 高级款</div>
+      <div class="style" data-v="celebration"><span class="sw" style="background:linear-gradient(135deg,#fbf6ec,#e8796a)"></span>Birthday · Celebration 明亮</div>
+      <div class="style" data-v="soft"><span class="sw" style="background:linear-gradient(135deg,#f7f2ea,#c8a97e)"></span>Birthday · Soft 温柔</div>
+      <div class="style" data-v="pop"><span class="sw" style="background:linear-gradient(135deg,#fffdf6,#2b4cff)"></span>Birthday · Pop 大胆</div>
+      <div class="style" data-v="night"><span class="sw" style="background:linear-gradient(135deg,#0b101c,#dec9a0)"></span>Birthday · Night 高级</div>
+      <div class="style" data-v="diorama"><span class="sw" style="background:linear-gradient(135deg,#06090f,#e8c98a)"></span>Birthday · Diorama 立体(备选)</div>
     </div>
-    <div class="muted" style="margin-bottom:12px">Night 高级款 = 纸张印刷质感 + 排版化构图 + 身份证背面, 并额外产出<b>静态卡面 PNG</b>(正片/背面/展示图)。</div>
+    <div class="muted" style="margin-bottom:12px">五套 Birthday 模板共用一条流程: 纸张/印刷质感 + 排版化构图 + 身份证背面, 并额外产出<b>静态卡面 PNG</b>(正片/背面/展示图)。</div>
     <div class="muted" id="tplHint" style="margin:-6px 0 12px"></div>
     <label>图片处理方式</label>
     <div class="styles" id="modes" style="margin-bottom:6px">
@@ -140,18 +144,20 @@ bindChips("templates", (v) => { currentTemplate = v; syncTemplateFields(); });
 
 /* 按模板显示真正会用到的字段, 避免"填了却不显示" */
 function syncTemplateFields() {
-  const night = currentTemplate === "night";
+  const tpl = currentTemplate;
+  const classic = tpl === "studio";
+  const night = tpl === "night";
   const show = (id, on) => { const el = $(id); if (el) el.style.display = on ? "" : "none"; };
-  show("styleBlock", !night);
-  show("row_age", night);
-  show("row_wish", night);
-  show("row_name", night);
-  show("row_tagline", !night);
-  $("tplHint").innerHTML = night
-    ? "当前模板会用到的字段:<b>卡名</b>(显示为顶部 FOR 行)· 副标题 · <b>年龄</b> · 日期 · 祝福语 · 名字 · 编号 · 系列名 · 背面描述。" +
-      "背景由模板固定为深色纸基, <b>不受「背景风格」影响</b>。"
-    : "当前模板会用到的字段:卡名 · 副标题 · 技法 · 一句话 · 编号 · 系列名 · 背面描述。" +
-      "年龄 / 祝福语 / 名字不用于此模板(切到 Night 高级款即可用)。";
+  show("styleBlock", classic);           // 背景风格只有经典模板用
+  show("row_age", !classic);             // 年龄: 五套 Birthday 都用, 经典不用
+  show("row_name", !classic);
+  show("row_wish", night);               // 祝福语目前只有 Night 用
+  show("row_tagline", classic || tpl === "celebration" || tpl === "soft" || tpl === "diorama");
+  $("tplHint").innerHTML = classic
+    ? "当前模板会用到的字段:卡名 · 副标题 · 技法 · 一句话 · 编号 · 系列名 · 背面描述(可用「背景风格」换底色)。"
+    : "当前模板会用到的字段:<b>卡名</b> · 副标题 · 年龄 · 日期 · " +
+      (night ? "<b>祝福语</b> · " : (tpl === "pop" ? "" : "一句话 · ")) +
+      "名字 · 编号 · 系列名 · 背面描述。背景由模板固定, <b>不受「背景风格」影响</b>。";
 }
 syncTemplateFields();
 
