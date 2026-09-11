@@ -131,6 +131,16 @@
   </div>
 </main>
 
+<dialog id="editDialog">
+  <h3 id="editTitle" style="margin:0 0 12px;font-size:15px"></h3>
+  <div class="grid" id="editFields" style="max-height:56vh;overflow:auto"></div>
+  <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+    <button class="btn" id="editSave">保存并重出静态卡面</button>
+    <button class="btn" id="editCancel" style="background:#8a8378">取消</button>
+    <span class="muted" id="editNote">只重画文字层与二维码, 不跑 3D</span>
+  </div>
+</dialog>
+
 <script>
 const $ = (id) => document.getElementById(id);
 let chosen = null, currentStyle = "ink", currentMode = "auto", currentTemplate = "studio", pollTimer = null;
@@ -191,6 +201,62 @@ function load(f) {
   if (!$("f_title").value) $("f_title").value = f.name.replace(/\.[^.]+$/, "");
   $("go").disabled = false;
 }
+
+/* 改文案 → 秒级重出静态卡面(§17 保存当前配置) */
+const EDIT_FIELDS = [
+  ["title", "卡名"], ["subtitle", "副标题"], ["age", "年龄"], ["technique", "日期"],
+  ["edition", "编号"], ["name", "名字"], ["wish", "祝福语(Night)"], ["tagline", "一句话"],
+  ["collection", "系列名(背面)"], ["description", "背面描述"],
+  ["qrUrl", "二维码链接(留空则不显示)"],
+];
+async function openEditor(id, title) {
+  const r = await fetch("/api/config/" + id);
+  if (!r.ok) { alert("读取配置失败"); return; }
+  const data = await r.json();
+  const box = $("editFields");
+  box.innerHTML = "";
+  for (const [k, label] of EDIT_FIELDS) {
+    const d = document.createElement("div");
+    const lab = document.createElement("label");
+    lab.textContent = label;
+    const inp = document.createElement("input");
+    inp.id = "e_" + k;
+    inp.value = data.fields[k] || "";
+    d.append(lab, inp);
+    box.appendChild(d);
+  }
+  $("editTitle").textContent = "改文案 · " + (title || id);
+  $("editNote").textContent = "当前模板: " + data.template + " · 只重画文字层与二维码, 不跑 3D";
+  $("editDialog").dataset.id = id;
+  $("editDialog").showModal();
+}
+async function saveEditor() {
+  const id = $("editDialog").dataset.id;
+  const body = {};
+  for (const [k] of EDIT_FIELDS) body[k] = $("e_" + k).value;
+  const btn = $("editSave");
+  btn.disabled = true; btn.textContent = "保存中…";
+  try {
+    const r = await fetch("/api/config/" + id, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) {
+      alert("保存失败:请看任务日志");
+      $("log").style.display = "block";
+      startPoll();
+    } else {
+      $("editDialog").close();
+      $("log").style.display = "block";
+      startPoll();
+    }
+  } catch (err) {
+    alert("保存失败: " + err);
+  }
+  btn.disabled = false; btn.textContent = "保存并重出静态卡面";
+}
+$("editCancel").onclick = () => $("editDialog").close();
+$("editSave").onclick = saveEditor;
 
 /* 生成 */
 const val = (id) => (($(id) || {}).value || "").trim();   // 容错取值: 元素不存在也不抛异常
@@ -260,6 +326,12 @@ async function poll() {
       b.style.cssText = "padding:5px 12px;font-size:12px;margin-left:auto";
       b.onclick = () => showViewer(j.id, j.title);
       el.querySelector(".row").appendChild(b);
+      const edit = document.createElement("button");
+      edit.className = "btn"; edit.textContent = "✏️ 改文案";
+      edit.title = "保存配置并秒级重出静态卡面(不重跑 3D)";
+      edit.style.cssText = "padding:5px 12px;font-size:12px";
+      edit.onclick = () => openEditor(j.id, j.title);
+      el.querySelector(".row").appendChild(edit);
       if (!j.export || j.export.status === "error") {
         const e = document.createElement("button");
         e.className = "btn"; e.textContent = j.export ? "📦 重新导出" : "📦 导出卡牌";

@@ -357,6 +357,50 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ lines: job.lines }));
     }
 
+    // ---- 读取 / 保存卡片配置: 改文案 → 秒级重出静态卡面(§17) ----
+    const cfgMatch = p.match(/^\/api\/config\/([a-z0-9-]+)$/);
+    const EDITABLE = ["title", "subtitle", "tagline", "technique", "edition", "wish",
+                      "age", "name", "collection", "description", "qrUrl"];
+    if (cfgMatch && req.method === "GET") {
+      const f = path.join(PROJECTS, cfgMatch[1], "card-config.json");
+      if (!existsSync(f)) { res.writeHead(404); return res.end("no config"); }
+      const cfg = JSON.parse(await readFile(f, "utf8"));
+      const pick = {};
+      for (const k of EDITABLE) pick[k] = cfg[k] ?? "";
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({
+        id: cfgMatch[1], fields: pick,
+        template: (cfg._provenance || {}).template || cfg.backStyle || "studio",
+      }));
+    }
+    if (cfgMatch && req.method === "POST") {
+      const id = cfgMatch[1];
+      const dir = path.join(PROJECTS, id);
+      if (!existsSync(path.join(dir, "card-config.json"))) { res.writeHead(404); return res.end("no config"); }
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const editsPath = path.join(dir, "_edits.json");
+      await writeFile(editsPath, JSON.stringify(raw, null, 2), "utf8");
+      const logPath = path.join(dir, "edit.log");
+      try { await rm(logPath, { force: true }); } catch {}
+      const job = jobs.get(id);
+      const push = (l) => job && job.lines.push(l);
+      push?.("[工坊] 保存配置并重出静态卡面…");
+      const pyBin = process.env.PY || "python";
+      let code = await runPy(
+        [pyBin, "-u", path.join(__dir, "apply_config_edits.py"), dir, editsPath],
+        ROOT, logPath, push);
+      if (code === 0) {
+        code = await runPy([pyBin, "-u", path.join(__dir, "make_static_card.py"), dir],
+                           ROOT, logPath, push);
+      }
+      res.writeHead(code === 0 ? 200 : 500, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({
+        ok: code === 0,
+        preview: "/cardimg/" + id + "/static-preview.png?t=" + Date.now(),
+        log: "/api/jobs/" + id + "/log",
+      }));
+    }
+
     // 模板字段落位预览图
     const tplImg = p.match(/^\/tpl\/([a-z]+)\.png$/);
     if (tplImg && req.method === "GET") {
