@@ -358,6 +358,33 @@ def render_back(tpl, cfg):
 
     field("CREATED BY", 1330, cfg.get("createdBy") or "")
     field("OWNED BY", 1396, cfg.get("ownedBy") or "")
+
+    # 二维码(§11 有就展示): 低右角小方块, 融入卡背设计, 不做商品包装式大黑白码
+    qr = cfg.get("qr") or {}
+    if qr.get("enabled") and qr.get("matrix"):
+        m = qr["matrix"]
+        n = len(m)
+        box, pad = 132, 12
+        x0 = w - 92 - box
+        y0 = h - 92 - box
+        tile = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        td = ImageDraw.Draw(tile)
+        td.rounded_rectangle([x0 - pad, y0 - pad, x0 + box + pad, y0 + box + pad], radius=12,
+                             fill=(250, 247, 240, 242) if style in ("night", "diorama", "pop")
+                             else (255, 253, 249, 246))
+        im.alpha_composite(tile)
+        cell = box / n
+        dqr = ImageDraw.Draw(im)
+        dark = (13, 17, 28, 255) if style in ("night", "diorama") else (36, 31, 25, 255)
+        for r in range(n):
+            row = str(m[r])
+            for c in range(n):
+                if row[c] == "1":
+                    dqr.rectangle([x0 + c * cell, y0 + r * cell,
+                                   x0 + (c + 1) * cell - 0.4, y0 + (r + 1) * cell - 0.4], fill=dark)
+        d2 = ImageDraw.Draw(im)
+        tracked(d2, (x0 + box / 2, y0 + box + pad + 24), "SCAN", f(SANS, 12),
+                S["gold"] + (170,) if style in ("night", "diorama") else S["ink"] + (140,), 3.0, True)
     return im.convert("RGB")
 
 

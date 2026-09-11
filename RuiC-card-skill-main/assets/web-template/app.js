@@ -330,6 +330,32 @@ function backTexture() {
                            "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")");
   field("CREATED BY", 1330, config.createdBy || "");
   field("OWNED BY", 1396, config.ownedBy || "");
+  // 二维码(§11 有就展示): 只按 config.qr.matrix 绘制, 无外部依赖
+  const qrCfg = config.qr || (config.qrUrl ? { enabled: true, url: config.qrUrl } : null);
+  if (qrCfg && qrCfg.enabled && Array.isArray(qrCfg.matrix) && qrCfg.matrix.length) {
+    const qn = qrCfg.matrix.length;
+    const qbox = 132, qpad = 12;
+    const qx = 1024 - 92 - qbox, qy = 1536 - 92 - qbox;
+    ctx.save();
+    ctx.fillStyle = dark ? "rgba(250,247,240,.94)" : "rgba(255,253,249,.96)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(qx - qpad, qy - qpad, qbox + qpad * 2, qbox + qpad * 2, 12);
+    else ctx.rect(qx - qpad, qy - qpad, qbox + qpad * 2, qbox + qpad * 2);
+    ctx.fill();
+    const qcell = qbox / qn;
+    ctx.fillStyle = dark ? "#0d111c" : "#241f19";
+    for (let r = 0; r < qn; r++) {
+      const rowStr = String(qrCfg.matrix[r]);
+      for (let c = 0; c < qn; c++) {
+        if (rowStr.charAt(c) === "1") {
+          ctx.fillRect(qx + c * qcell, qy + r * qcell, Math.ceil(qcell), Math.ceil(qcell));
+        }
+      }
+    }
+    ctx.restore();
+    tracked("SCAN", 1024 - 92 - qbox / 2, qy + qbox + qpad + 24, "12px 'Segoe UI', Arial", 3,
+            "rgba(" + (dark ? "222,201,160,.72" : "58,52,44,.58") + ")");
+  }
   return canvasTexture(c);
 }function addShadow() {
   const c = document.createElement("canvas");
@@ -365,7 +391,9 @@ function refreshIcons() {
   const overrides = { "stroke-width": 1.5 };
   document.querySelectorAll("[data-lucide]").forEach((el) => {
     const name = el.getAttribute("data-lucide");
-    const tree = icons[name];
+    // 图标键是 PascalCase("Rotate3d"), 页面写 kebab-case("rotate-3d"), 归一后再取
+    const pascal = name.replace(/(^|-)([a-z0-9])/g, (_m, _p, c) => c.toUpperCase());
+    const tree = icons[name] || icons[pascal];
     if (!tree) return;
     const [tag, defaults = {}, children = []] = tree;
     const svg = renderIconNode([tag, { ...defaults, ...overrides }, children]);
@@ -710,6 +738,10 @@ function fallback3D(error) {
       tx = Math.sin(t * 0.7) * 0.07 + 0.05;
       ty = Math.sin(t * 0.55) * 0.11 - 0.18;
     }
+    if (motionOn) {                     // 陀螺仪(CSS-3D 回退路径)
+      tx = -motionVals.pitch * 0.30;
+      ty = motionVals.roll * 0.45;
+    }
     curX += (tx - curX) * 0.08;
     curY += (ty - curY) * 0.08;
     curFlip += (flipTarget - curFlip) * 0.12;
@@ -733,7 +765,10 @@ function fallback3D(error) {
     b.title = value ? "暂停旋转" : "自动旋转";
     const icon = document.createElement("i");
     icon.setAttribute("data-lucide", value ? "pause" : "play");
-    b.replaceChildren(icon);
+    const label = document.createElement("span");
+    label.className = "btn-label";
+    label.textContent = value ? "暂停" : "自动";
+    b.replaceChildren(icon, label);
     refreshIcons();
   };
   const fallbackFinish = (value) => {
@@ -756,6 +791,8 @@ function fallback3D(error) {
   $("back").onclick = () => setFlip(true);
   $("auto").disabled = false;
   $("auto").onclick = () => setAutoUI(!sway);
+  wireMotionButton();
+  wireMotionButton();
   $("reset").disabled = false;
   $("reset").onclick = () => {
     tx = -0.03; ty = -0.06; lastMove = 0;
@@ -827,10 +864,12 @@ function setAuto(value) {
   $("auto").setAttribute("aria-pressed", String(auto));
   $("auto").setAttribute("aria-label", auto ? "暂停旋转" : "自动旋转");
   $("auto").title = auto ? "暂停旋转" : "自动旋转";
-  $("auto").replaceChildren();
   const icon = document.createElement("i");
   icon.setAttribute("data-lucide", auto ? "pause" : "play");
-  $("auto").append(icon);
+  const label = document.createElement("span");
+  label.className = "btn-label";
+  label.textContent = auto ? "暂停" : "自动";
+  $("auto").replaceChildren(icon, label);
   refreshIcons();
 }
 function setFinish(value) {
@@ -1004,6 +1043,7 @@ function setupControls() {
     if (flipped) flip(false);
     setAuto(!auto);
   };
+  wireMotionButton();
   $("flip").onclick = () => flip();
   $("front").onclick = () => flip(false);
   $("back").onclick = () => flip(true);
@@ -1099,6 +1139,85 @@ function saveCard() {
     notice("图片未能保存，请重试");
   }
 }
+// ---- Device Motion(陀螺仪): 增强交互; 不支持或被拒时自动回落 Touch Drag ----
+let motionOn = false, motionState = "off";
+const motionVals = { pitch: 0, roll: 0 };
+function motionAllowed() {
+  const it = (config && config.interaction) || {};
+  return it.deviceMotion !== false && typeof window.DeviceOrientationEvent !== "undefined";
+}
+function onOrientation(e) {
+  if (e.beta === null && e.gamma === null) return;
+  const strength = Math.max(0, Math.min(1.5, Number((config?.parameters || {}).motionStrength ?? 0.75)));
+  const beta = Number.isFinite(e.beta) ? e.beta : 45;
+  const gamma = Number.isFinite(e.gamma) ? e.gamma : 0;
+  motionVals.pitch = Math.max(-1, Math.min(1, (beta - 45) / 40)) * strength;
+  motionVals.roll = Math.max(-1, Math.min(1, gamma / 40)) * strength;
+  if (auto) setAuto(false);              // 陀螺仪接管时关掉自动巡游
+}
+function startMotion() {
+  window.addEventListener("deviceorientation", onOrientation, true);
+  motionOn = true;
+  motionState = "on";
+  syncMotionButton();
+}
+function stopMotion() {
+  window.removeEventListener("deviceorientation", onOrientation, true);
+  motionOn = false;
+  motionState = "off";
+  motionVals.pitch = 0;
+  motionVals.roll = 0;
+  syncMotionButton();
+}
+async function enableMotion() {
+  if (!motionAllowed()) {
+    motionState = "unsupported";
+    syncMotionButton();
+    notice("此设备/浏览器不支持陀螺仪, 可继续拖拽卡片");
+    return false;
+  }
+  const DOE = window.DeviceOrientationEvent;
+  if (typeof DOE.requestPermission === "function") {
+    try {
+      const res = await DOE.requestPermission();
+      if (res !== "granted") {
+        motionState = "denied";
+        syncMotionButton();
+        notice("未授权陀螺仪, 仍可用拖拽");
+        return false;
+      }
+    } catch (err) {
+      motionState = "denied";
+      syncMotionButton();
+      notice("陀螺仪授权失败, 仍可用拖拽");
+      return false;
+    }
+  }
+  startMotion();
+  notice("陀螺仪已开启: 倾斜手机看层次");
+  return true;
+}
+function syncMotionButton() {
+  const b = $("motion");
+  if (!b) return;
+  b.disabled = false;
+  b.setAttribute("aria-pressed", String(motionOn));
+  b.title = motionState === "unsupported" ? "本设备不支持陀螺仪"
+    : (motionOn ? "关闭陀螺仪" : "开启陀螺仪");
+  const icon = document.createElement("i");
+  icon.setAttribute("data-lucide", motionOn ? "rotate-ccw" : "rotate-3d");
+  const label = document.createElement("span");
+  label.className = "btn-label";
+  label.textContent = motionOn ? "关闭陀螺仪" : "陀螺仪";
+  b.replaceChildren(icon, label);
+  refreshIcons();
+}
+function wireMotionButton() {
+  const b = $("motion");
+  if (!b) return;
+  syncMotionButton();
+  b.onclick = () => (motionOn ? stopMotion() : enableMotion());
+}
 function animate(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.06) || 0;
   lastTime = now;
@@ -1107,6 +1226,11 @@ function animate(now) {
   if (auto) {
     targetY = Math.sin(elapsed * 0.42) * 0.23 - 0.055;
     targetX = Math.sin(elapsed * 0.53) * 0.055 - 0.018;
+  }
+  if (motionOn && !dragging) {          // 陀螺仪优先于自动巡游
+    const motionBase = flipped ? Math.PI : 0;
+    targetY = motionBase + motionVals.roll * 0.60;
+    targetX = -motionVals.pitch * 0.34;
   }
   const ease = media.matches ? 1 : 1 - Math.exp(-dt * 8);
   root.rotation.x += (targetX - root.rotation.x) * ease;

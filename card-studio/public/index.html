@@ -110,6 +110,7 @@
       <div id="row_edition"><label>编号</label><input id="f_edition" placeholder="NO.001 / 001" /></div>
       <div id="row_collection"><label>系列名</label><input id="f_collection" value="我的全息典藏" /></div>
       <div class="full" id="row_desc"><label>背面描述</label><input id="f_desc" placeholder="这张卡的一句话…" /></div>
+      <div class="full" id="row_qr"><label>二维码链接(可选,填了就印在背面右下角)</label><input id="f_qr" placeholder="https://… 留空则背面不显示二维码" /></div>
     </div>
   </div>
 
@@ -213,6 +214,7 @@ $("go").onclick = async () => {
     age: val("f_age"),
     wish: val("f_wish"),
     name: val("f_name"),
+    qrUrl: val("f_qr"),
     finish: "gold",
   };
   try {

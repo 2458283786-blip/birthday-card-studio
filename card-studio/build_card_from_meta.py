@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import build_birthday_set as B  # noqa: E402
+import qr_util  # noqa: E402
 
 TEMPLATES = list(B.TEMPLATES.keys())
 
@@ -35,6 +36,7 @@ def main():
     params = dict(t["params"])
     params.setdefault("textDepth", {"celebration": 0.40, "soft": 0.38, "pop": 0.45,
                                     "night": 0.55, "diorama": 0.60}[tpl])
+    params.setdefault("motionStrength", 0.75)      # 陀螺仪灵敏度
 
     def m(key, default=""):
         v = meta.get(key)
@@ -53,13 +55,16 @@ def main():
         "description": m("description"),
         "createdBy": m("createdBy"),
         "ownedBy": m("ownedBy"),
+        "qrUrl": m("qrUrl"),
         "backStyle": tpl,
         "appearance": {"finish": t.get("finish", "pearl"), "background": t["page_bg"]},
         "material": t.get("material", {}),
         "parameters": params,
         "safeArea": {"scale": 1.0, "offset": [0.0, 0.0]},
+        "interaction": {"deviceMotion": True, "parallax": True, "holo": True},
         "_provenance": {"template": tpl, "made_by": "card-studio/build_card_from_meta.py"},
     }
+    qr_util.attach(cfg)          # 有二维码链接 → 生成矩阵写入配置(§11)
     (project / "card-config.json").write_text(
         json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf8")
     print(f"[模板 {tpl}] 配置已写入, 开始生成五层素材…", flush=True)

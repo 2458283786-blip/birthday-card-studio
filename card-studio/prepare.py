@@ -378,6 +378,7 @@ def main():
         "edition": meta.get("edition", "NO.001 / 001"),
         "collection": meta.get("collection", "我的全息典藏") or "我的全息典藏",
         "description": meta.get("description", "") or "拖图生成的程序化全息卡。",
+        "qrUrl": meta.get("qrUrl", ""),
         "appearance": {"finish": finish, "background": PAGE_BG[a.style]},
         "parameters": {"subjectScale": 1.0, "subjectDepth": 0.3,
                        "backgroundDepth": -0.2, "foil": 0.62},
@@ -387,6 +388,11 @@ def main():
                         "template": "studio",
                         "style": a.style, "mode": mode, "report": report},
     }
+    try:                                    # 有二维码链接 → 生成矩阵(§11)
+        import qr_util
+        qr_util.attach(config)
+    except Exception as e:
+        log(f"二维码跳过: {type(e).__name__}")
     (root / "card-config.json").write_text(
         json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
     log("配置已写入 card-config.json, 素材就绪")

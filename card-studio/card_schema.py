@@ -42,6 +42,28 @@ def _finish_to_material(finish):
     }.get(str(finish or "").lower(), "pearl")
 
 
+def _media_block(project):
+    """§12 视频只做结构预留: 包内约定 video/front.mp4(+ preview/front.jpg 作海报),
+    存在就切成 video 类型, 不存在就是纯图片卡 —— 结构始终兼容 video。"""
+    project = Path(project)
+    vid = project / "video" / "front.mp4"
+    poster = "preview/front.jpg"
+    if vid.exists():
+        return {
+            "type": "video",
+            "src": "video/front.mp4",
+            "poster": poster,
+            "video": {"src": "video/front.mp4", "poster": poster,
+                      "autoplay": False, "loop": False, "holdLastFrame": True},
+        }
+    return {
+        "type": "image",
+        "src": "front.png",
+        "poster": poster,
+        "video": None,             # 预留: 未来放 video/front.mp4 即可自动生效
+    }
+
+
 def build_card_json(project, card_id, internal_id=None, theme="birthday", template=None,
                     layers=None, has_back=True, status="final"):
     """card_id 传规范形式(CARD-0001); 展示形式自动派生为 CARD #0001。"""
@@ -100,9 +122,20 @@ def build_card_json(project, card_id, internal_id=None, theme="birthday", templa
             "regions": mat.get("regions") or {},
             "amounts": mat.get("amounts") or {},
         },
-        "interaction": {"parallax": True, "flip": has_back, "holo": finish != "original"},
-        "media": {"type": "image", "src": "front.png", "poster": "preview/front.jpg"},
-        "qr": {"enabled": False, "target": "showcase", "url": None},
+        "interaction": {
+            "parallax": True,
+            "flip": has_back,
+            "holo": finish != "original",
+            # Device Motion(陀螺仪)作为增强交互; 不可用时 Viewer 自动回落 Touch Drag
+            "deviceMotion": (cfg.get("interaction") or {}).get("deviceMotion", True),
+            "motionStrength": params.get("motionStrength", 0.75),
+        },
+        "media": _media_block(project),
+        "qr": {
+            "enabled": bool((cfg.get("qr") or {}).get("enabled")),
+            "target": "showcase",
+            "url": (cfg.get("qr") or {}).get("url") or None,
+        },
         "status": status,
         "cardVersion": 1,
         "metadata": {"tags": [], "note": "", "custom": {}},

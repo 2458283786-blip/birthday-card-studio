@@ -254,6 +254,7 @@ const server = http.createServer(async (req, res) => {
         age: String(raw.age || "").slice(0, 4),
         wish: String(raw.wish || "").slice(0, 80),
         name: String(raw.name || "").slice(0, 24),
+        qrUrl: String(raw.qrUrl || "").slice(0, 300),
         description: String(raw.description || "").slice(0, 200),
         finish: ["gold", "silver", "pearl", "original"].includes(raw.finish) ? raw.finish : "gold",
       };

@@ -5,7 +5,6 @@
 用法:
   python card-studio/export_package.py <项目目录> [--out 输出目录] [--card-id CARD-0001]
                                       [--theme birthday] [--template night]
-
 产出:
   CARD-0001/
     card.json                # §14 结构
@@ -26,6 +25,12 @@ import shutil
 import sys
 import zipfile
 from pathlib import Path
+
+try:                       # 控制台可能是 GBK, 打印 ✅ 等符号会崩
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 import numpy as np
 from PIL import Image
