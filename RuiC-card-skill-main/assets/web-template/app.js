@@ -48,6 +48,7 @@ uniform float uTime, uFoil, uScale, uDepth, uBgDepth, uFinish, uHasLine, uRelief
 uniform vec2 uFit, uSafeOffset;
 // 分区材质: 0 哑光 / 1 珠光 / 2 金属箔 / 3 亮面
 uniform vec4 uMatType, uMatAmt;
+uniform float uTextDepth;   // 文字层自己的景深(0=固定在最前)
 uniform vec3 uView;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 float inside(vec2 p) { return step(0.,p.x)*step(0.,p.y)*step(p.x,1.)*step(p.y,1.); }
@@ -128,7 +129,9 @@ void main() {
   float band = sweep(uv);
   float goldBoost = uFinish > 2.5 ? 1.7 : 1.0;
   float edge = 1.-smoothstep(.015,.06,min(min(uv.x,1.-uv.x),min(uv.y,1.-uv.y)));
-  vec4 text = texture2D(tText,uv);
+  vec2 tu = parallax(uv, uTextDepth);
+  vec4 text = texture2D(tText, clamp(tu,0.,1.));
+  text.a *= inside(tu);
   float wFrame = clamp(edge,0.,1.);
   float wText = clamp(text.a*(1.-uRelief),0.,1.)*(1.-wFrame);
   float wSub = clamp(subject.a,0.,1.)*(1.-wFrame)*(1.-wText);
@@ -150,7 +153,7 @@ void main() {
   col += line*inside(su)*subject.a*band*sparkAmt*.035;
   // 文字: 自己的材质(可做烫金字)
   if (wText > 0.001) {
-    vec3 cText = applyMat(text.rgb, uv, uMatType.y, uMatAmt.y*gate, band, goldBoost);
+    vec3 cText = applyMat(text.rgb, tu, uMatType.y, uMatAmt.y*gate, band, goldBoost);
     col = mix(col, cText, wText);
   }
   gl_FragColor = vec4(pow(clamp(col,0.,1.),vec3(2.2)),1.);
@@ -423,6 +426,7 @@ async function init() {
     uFit: { value: new THREE.Vector2(...fit) },
     uFoil: { value: p.foil ?? 0.52 },
     uMatType: { value: new THREE.Vector4(matType[0], matType[1], matType[2], matType[3]) },
+    uTextDepth: { value: p.textDepth ?? 0 },
     uMatAmt: { value: new THREE.Vector4(matAmt[0], matAmt[1], matAmt[2], matAmt[3]) },
     uScale: { value: p.subjectScale ?? 1 },
     uDepth: { value: p.subjectDepth ?? 0.32 },

@@ -17,7 +17,7 @@ import json, math, os, random, sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 W, H = 1024, 1536
 FONTS = r"C:\Windows\Fonts"
@@ -102,7 +102,7 @@ def tw(d, text, fnt, tracking=0.0):
 def photo_layer(src_path, tpl, box, mask_kind):
     """box=(l,t,r,b) 照片可见区域; mask_kind 决定融合方式。保留原图, 不抠图。
     若素材本身带透明通道(透明 PNG), Diorama 会自动切成真·立体抠图模式。"""
-    raw = Image.open(src_path)
+    raw = ImageOps.exif_transpose(Image.open(src_path))   # 手机横拍带 EXIF 旋转时必须先摆正
     if tpl == "diorama" and ("A" in raw.getbands()):
         alpha = raw.convert("RGBA").getchannel("A")
         if (np.asarray(alpha) < 8).mean() > 0.004:
@@ -131,7 +131,7 @@ def photo_layer(src_path, tpl, box, mask_kind):
 
     l, t, r, b = box
     pw, ph = r - l, b - t
-    im = Image.open(src_path).convert("RGB")
+    im = ImageOps.exif_transpose(Image.open(src_path)).convert("RGB")
     iw, ih = im.size
     scale = max(pw / iw, ph / ih)
     nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
@@ -745,7 +745,7 @@ def main():
     if cp.exists():
         cfg = json.loads(cp.read_text(encoding="utf8"))
 
-    Image.open(photo).convert("RGB").save(out / "source.png")
+    ImageOps.exif_transpose(Image.open(photo)).convert("RGB").save(out / "source.png")
     box, kind = photo_box(tpl)
     photo_layer(photo, tpl, box, kind).save(out / "subject.png")
     background(tpl).save(out / "background.png")

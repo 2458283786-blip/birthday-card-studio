@@ -208,7 +208,8 @@ def compose_front(tpl, cfg, rx, ry, foil_override):
     gate = 0.15 + 0.85 * gate
     band = np.power(0.5 + 0.5 * np.sin((u * 0.72 + v * 0.45 + view[0] * 1.2 + view[1] * 0.6) * 6.283), 10.0)
     edge = 1.0 - smoothstep(0.015, 0.06, np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v)))
-    t = sample(tx, 0, 0, clip_alpha=False)
+    # 文字层: 按自己的景深采样(textDepth=0 即固定在最前)
+    t = sample(tx, *parallax_shift(view, p.get("textDepth", 0.0)), clip_alpha=True)
     ta = t[..., 3:4] / 255.0
     boost = 1.7 if str((cfg.get("appearance") or {}).get("finish", "")).lower() == "gold" else 1.0
     w_frame = np.clip(edge, 0, 1)

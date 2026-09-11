@@ -48,7 +48,7 @@ TEMPLATES = {
     "night": dict(
         theme="dark", page_bg="#080c16", ink="#f0e8d6", accent="#dec9a0",
         params=dict(subjectScale=1.0, subjectDepth=0.34, backgroundDepth=-0.30,
-                    effectsDepth=0.62, effectsScale=1.05, foil=0.52),
+                    effectsDepth=0.62, effectsScale=1.05, foil=0.52, textDepth=0.55),
         material=dict(regions=dict(frame="pearl", text="matte", subject="pearl", background="pearl"),
                       amounts=dict(frame=0.5, subject=0.35, background=0.35))),
     # 立体画框: 大层距 + 暖金箔光扫 + 浮雕投影

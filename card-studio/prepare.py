@@ -17,7 +17,7 @@ mode:  auto=自动判断(推荐) | keep=保留整图不抠 | cut=扣除纯色底
 import argparse, json, math, os, random, sys, traceback
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageChops
+from PIL import Image, ImageDraw, ImageFilter, ImageChops, ImageOps
 
 CANVAS = (1024, 1536)          # 竖版卡画布
 CUT_BOX = (900, 980)           # 抠图主体构图区 (宽, 高)
@@ -46,7 +46,7 @@ def log(msg):
 
 # ----------------------------------------------------------------- 素材判断/抠图
 def load_rgba(path):
-    im = Image.open(path)
+    im = ImageOps.exif_transpose(Image.open(path))   # 手机横拍 EXIF 旋转先摆正
     if im.mode in ("RGBA", "LA"):
         return im.convert("RGBA")
     return im.convert("RGB").convert("RGBA")

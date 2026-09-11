@@ -67,6 +67,12 @@
 
   <div class="card">
     <h2>② 卡片设置(不填也有默认值)</h2>
+    <label>生成模板</label>
+    <div class="styles" id="templates" style="margin-bottom:6px">
+      <div class="style on" data-v="studio"><span class="sw" style="background:linear-gradient(135deg,#efe9db,#b8862d)"></span>经典工坊风格</div>
+      <div class="style" data-v="night"><span class="sw" style="background:linear-gradient(135deg,#0b101c,#dec9a0)"></span>Birthday / Night 高级款</div>
+    </div>
+    <div class="muted" style="margin-bottom:12px">Night 高级款 = 纸张印刷质感 + 排版化构图 + 身份证背面, 并额外产出<b>静态卡面 PNG</b>(正片/背面/展示图)。</div>
     <label>图片处理方式</label>
     <div class="styles" id="modes" style="margin-bottom:6px">
       <div class="style on" data-v="auto"><span class="sw" style="background:conic-gradient(#f6f1e6,#b8862d,#f6f1e6,#c9b98f,#f6f1e6)"></span>自动判断(推荐)</div>
@@ -84,8 +90,10 @@
     <div class="grid" style="margin-top:14px">
       <div><label>卡名(卡面大字)</label><input id="f_title" placeholder="自动取文件名" /></div>
       <div><label>副标题(如 系列/角色称号)</label><input id="f_subtitle" /></div>
-      <div><label>技法/招式(卡底大字)</label><input id="f_technique" /></div>
-      <div><label>一句话(卡底小字)</label><input id="f_tagline" /></div>
+      <div><label>年龄(Night 高级款的核心视觉)</label><input id="f_age" placeholder="如 20;留空则不显示" /></div>
+      <div><label>日期</label><input id="f_technique" placeholder="2026.09.09" /></div>
+      <div><label>祝福语(卡底一行)</label><input id="f_wish" placeholder="MAY EVERY YEAR BE KIND TO YOU" /></div>
+      <div><label>名字(可选, 显示为 FOR NAME)</label><input id="f_name" /></div>
       <div><label>编号</label><input id="f_edition" placeholder="NO.001 / 001" /></div>
       <div><label>系列名</label><input id="f_collection" value="我的全息典藏" /></div>
       <div class="full"><label>背面描述</label><input id="f_desc" placeholder="这张卡的一句话…" /></div>
@@ -111,7 +119,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-let chosen = null, currentStyle = "ink", currentMode = "auto", pollTimer = null;
+let chosen = null, currentStyle = "ink", currentMode = "auto", currentTemplate = "studio", pollTimer = null;
 
 /* 风格与处理方式选择 */
 function bindChips(containerId, onPick) {
@@ -124,6 +132,7 @@ function bindChips(containerId, onPick) {
 }
 bindChips("styles", (v) => { currentStyle = v; });
 bindChips("modes", (v) => { currentMode = v; });
+bindChips("templates", (v) => { currentTemplate = v; });
 
 /* 拖放 */
 const drop = $("drop"), file = $("file");
@@ -160,6 +169,10 @@ $("go").onclick = async () => {
     description: $("f_desc").value.trim(),
     style: currentStyle,
     mode: currentMode,
+    template: currentTemplate,
+    age: ($("f_age") || {}).value || "",
+    wish: ($("f_wish") || {}).value || "",
+    name: ($("f_name") || {}).value || "",
     finish: "gold",
   };
   $("go").disabled = true;
@@ -221,6 +234,20 @@ async function poll() {
         const s = document.createElement("span");
         s.className = "muted"; s.textContent = "导出中…";
         el.querySelector(".row").appendChild(s);
+      }
+      // Night 高级款: 直接给静态卡面
+      if (j.template === "night") {
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "display:flex;gap:12px;align-items:center;margin-top:10px";
+        wrap.innerHTML =
+          '<img src="/cardimg/' + j.id + '/static-preview.png" alt="静态卡面" ' +
+          'style="height:190px;border-radius:8px;border:1px solid var(--line);background:#0b0f18" ' +
+          'onerror="this.style.display=\'none\'" />' +
+          '<div class="muted">静态卡面已生成<br/>' +
+          '<a href="/cardimg/' + j.id + '/static.png" target="_blank">正片 PNG</a> · ' +
+          '<a href="/cardimg/' + j.id + '/static-back.png" target="_blank">背面 PNG</a> · ' +
+          '<a href="/cardimg/' + j.id + '/static-preview.png" target="_blank">展示图</a></div>';
+        el.appendChild(wrap);
       }
     }
     box.appendChild(el);

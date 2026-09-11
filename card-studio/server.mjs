@@ -124,6 +124,59 @@ async function processJob(job) {
   await writeFile(metaPath, JSON.stringify(job.meta, null, 2), "utf8");
   const py = process.env.PY || "python";
 
+  if (job.template === "night") {
+    // ---- Birthday / Night 高级款: 静态优先的设计(自带纸张质感/排版/背面规则) ----
+    const cfg = {
+      subtitle: job.meta.subtitle || "HAPPY BIRTHDAY",
+      title: job.meta.title || "",
+      tagline: "",
+      technique: job.meta.technique || "",
+      edition: job.meta.edition || "",
+      wish: job.meta.wish || "",
+      age: job.meta.age || "",
+      name: job.meta.name || "",
+      createdBy: "", ownedBy: "",
+      backStyle: "night",
+      appearance: { finish: "pearl", background: "#080c16" },
+      material: {
+        holoEnabled: true,
+        regions: { frame: "pearl", text: "matte", subject: "pearl", background: "pearl" },
+        amounts: { frame: 0.5, subject: 0.35, background: 0.35 },
+      },
+      parameters: { subjectScale: 1.0, subjectDepth: 0.34, backgroundDepth: -0.30,
+                    effectsDepth: 0.62, effectsScale: 1.05, foil: 0.52, textDepth: 0.55 },
+      safeArea: { scale: 1.0, offset: [0.0, 0.0] },
+    };
+    await writeFile(path.join(job.dir, "card-config.json"),
+                    JSON.stringify(cfg, null, 2), "utf8");
+    let code = await runPy(
+      [py, "-u", path.join(__dir, "birthday_system.py"), job.image, job.dir, "night"],
+      ROOT, logPath, push);
+    if (code !== 0) {
+      job.status = "error";
+      job.lines.push("[工坊] Night 高级款素材生成失败(见上方提示)。");
+      return;
+    }
+    job.lines.push("[工坊] 素材就绪, 生成静态卡面(正片/背面/展示图)…");
+    await runPy([py, "-u", path.join(__dir, "make_static_card.py"), job.dir],
+                ROOT, logPath, push);
+    job.lines.push("[工坊] 静态卡面完成, 继续组装网页卡(约 1 分钟)…");
+    code = await runPy(
+      [py, "-u", path.join(SKILL, "run_pipeline.py"),
+       "--project", job.dir, "--blender", BLENDER, "--skip-npm", "--skip-render"],
+      ROOT, null, push);
+    const glbN = path.join(job.dir, "web", "assets", "card.glb");
+    if (code === 0 && existsSync(glbN)) {
+      job.status = "done";
+      job.lines.push("[工坊] ✅ 完成! 静态卡面: /cardimg/" + job.id + "/static-preview.png");
+      job.lines.push("[工坊] 网页预览: /p/" + job.id + "/");
+    } else {
+      job.status = "error";
+      job.lines.push("[工坊] 网页组装出错(静态卡面已生成, 可先在 projects\\" + job.id + " 查看 static.png)。");
+    }
+    return;
+  }
+
   let code = await runPy(
     [py, "-u", path.join(__dir, "prepare.py"), job.dir, job.image, job.style, metaPath, job.mode],
     ROOT, logPath, push);
@@ -217,11 +270,15 @@ const server = http.createServer(async (req, res) => {
         tagline: String(raw.tagline || "").slice(0, 60),
         technique: String(raw.technique || "").slice(0, 40),
         edition: edition.slice(0, 24),
+        age: String(raw.age || "").slice(0, 4),
+        wish: String(raw.wish || "").slice(0, 80),
+        name: String(raw.name || "").slice(0, 24),
         description: String(raw.description || "").slice(0, 200),
         finish: ["gold", "silver", "pearl", "original"].includes(raw.finish) ? raw.finish : "gold",
       };
       const style = ["ink", "space", "plain", "blackgold"].includes(raw.style) ? raw.style : "ink";
       const mode = ["auto", "keep", "cut"].includes(raw.mode) ? raw.mode : "auto";
+      const template = ["studio", "night"].includes(raw.template) ? raw.template : "studio";
       if (!raw.imageData) { res.writeHead(400); return res.end("no image"); }
       const m = /^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/s.exec(raw.imageData);
       if (!m) { res.writeHead(400); return res.end("bad image"); }
@@ -232,7 +289,7 @@ const server = http.createServer(async (req, res) => {
       const image = path.join(dir, "_upload." + ext);
       await writeFile(image, Buffer.from(m[2], "base64"));
       const job = {
-        id, dir, image, style, mode, meta, status: "queued", lines: [],
+        id, dir, image, style, mode, template, meta, status: "queued", lines: [],
         created: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
         preview: "/p/" + id + "/",
       };
@@ -247,6 +304,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && p === "/api/jobs") {
       const list = [...jobs.values()].map((j) => ({
         id: j.id, title: j.meta.title, edition: j.meta.edition, style: j.style,
+        template: j.template || "studio",
         status: j.status, created: j.created, last: j.lines.slice(-1)[0] || "",
         export: j.export || null,
       }));
@@ -314,6 +372,15 @@ const server = http.createServer(async (req, res) => {
       if (!job) { res.writeHead(404); return res.end("no job"); }
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ lines: job.lines }));
+    }
+
+    // 项目内的静态卡面图(白名单)
+    const img = p.match(/^\/cardimg\/([a-z0-9-]+)\/([a-z0-9._-]+)$/i);
+    if (img && req.method === "GET") {
+      const id = img[1], file = img[2];
+      const allow = ["static.png", "static-back.png", "static-preview.png", "static-back-preview.png"];
+      if (!/^card-[a-z0-9]+$/.test(id) || !allow.includes(file)) { res.writeHead(404); return res.end("no image"); }
+      return serveStatic(req, res, path.join(PROJECTS, id), file);
     }
 
     const prev = p.match(/^\/p\/([a-z0-9-]+)\/(.*)$/);
