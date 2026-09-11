@@ -119,9 +119,9 @@ def photo_layer(src_path, tpl, box, mask_kind):
                     crush=1.12, lift=0.0, blur=1.6, edge_k=0.35, vig=0.22,
                     fade_to=np.array([0.11, 0.19, 1.0], dtype=np.float32), fade_bottom=0.14,
                     fade_top=0.0, grain=0.006),
-        "night": dict(scale_crop=0.40, bright=0.97, contrast=1.07, sat=0.90, warm=0.055,
-                      crush=1.07, lift=0.0, blur=2.6, edge_k=0.85, vig=0.42,
-                      fade_to=NAVY, fade_bottom=0.72, fade_top=0.42, grain=0.006),
+        "night": dict(scale_crop=0.40, bright=1.00, contrast=1.17, sat=1.00, warm=0.05,
+                      crush=1.11, lift=0.0, blur=2.0, edge_k=0.6, vig=0.48,
+                      fade_to=NAVY, fade_bottom=0.24, fade_top=0.03, grain=0.006),
         # 立体画框: 保留原片色彩(不压不灰), 底部较短融入, 靠投影+顶缘反光营造浮雕
         "diorama": dict(scale_crop=0.40, bright=1.02, contrast=1.12, sat=1.02, warm=0.04,
                         crush=1.05, lift=0.0, blur=2.0, edge_k=0.5, vig=0.34,
@@ -181,8 +181,8 @@ def photo_layer(src_path, tpl, box, mask_kind):
 
     # 与卡面融合: 顶部/底部渐次过渡到模板底色
     yn = yy / ph
-    tt = np.clip((cfg["fade_top"] - yn) / max(cfg["fade_top"], 1e-6), 0, 1) ** 1.2 * 0.55
-    tb = np.clip((yn - (1.0 - cfg["fade_bottom"])) / max(cfg["fade_bottom"], 1e-6), 0, 1) ** 1.35 * 0.92
+    tt = np.clip((cfg["fade_top"] - yn) / max(cfg["fade_top"], 1e-6), 0, 1) ** 1.2 * 0.20
+    tb = np.clip((yn - (1.0 - cfg["fade_bottom"])) / max(cfg["fade_bottom"], 1e-6), 0, 1) ** 2.2 * 0.94
     fade = np.clip(tt + tb, 0, 1)
     a = a * (1.0 - fade[..., None]) + cfg["fade_to"] * fade[..., None]
     a += np.random.default_rng(6).normal(0, cfg["grain"], a.shape)
@@ -202,7 +202,8 @@ def photo_layer(src_path, tpl, box, mask_kind):
     else:  # band / full
         md.rectangle([0, 0, pw - 1, ph - 1], fill=255)
     m = np.asarray(mask).astype(np.float32) / 255.0
-    fside = np.clip(np.minimum(xx, pw - 1 - xx) / (110.0 if tpl == "diorama" else 46.0), 0, 1)
+    fside = np.clip(np.minimum(xx, pw - 1 - xx) /
+                    (110.0 if tpl == "diorama" else (10.0 if tpl == "night" else 46.0)), 0, 1)
     ftop = 1.0 if mask_kind != "band" else np.clip(yy / 150.0, 0, 1)
     fbot = (1.0 if mask_kind == "round_bottom"
             else np.clip((ph - 1 - yy) / (ph * cfg["fade_bottom"]) / 0.9, 0, 1))
@@ -218,6 +219,20 @@ def photo_layer(src_path, tpl, box, mask_kind):
         sh.paste(Image.new("RGBA", (pw, ph), (0, 0, 0, 215)), (l, t + 24), sm)
         canvas.alpha_composite(sh)
     canvas.paste(photo, (l, t), mask)
+    if tpl == "night":
+        # 照片像"印进纸里": 上缘一道内侧阴影 + 下缘 AO, 四周不做硬框
+        inset = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        idr = ImageDraw.Draw(inset)
+        for i in range(30):
+            a = int(34 * (1 - i / 30.0) ** 1.7)
+            idr.line([(0, t + i), (W, t + i)], fill=(4, 7, 14, a))
+        canvas.alpha_composite(inset.filter(ImageFilter.GaussianBlur(9)))
+        ao = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ad = ImageDraw.Draw(ao)
+        for i in range(64):
+            a = int(48 * (1 - i / 64.0) ** 1.8)
+            ad.line([(0, b - i), (W, b - i)], fill=(6, 9, 18, a))
+        canvas.alpha_composite(ao.filter(ImageFilter.GaussianBlur(10)))
     if tpl == "diorama":
         # 顶缘反光(纸张/相纸受光的一条细亮边)
         rim = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -273,19 +288,24 @@ def background(tpl):
                 r = 4.8 - j * 0.8
                 d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, 170))
     elif tpl == "night":
+        # 高级款底色: 深蓝黑纸基 + 左上暖光 + 右下冷补光, 再做纸张质感
         d = ImageDraw.Draw(im)
         for y in range(H):
             t = y / H
-            d.line([(0, y), (W, y)], fill=(int(10 + 12 * t), int(15 + 18 * t), int(28 + 26 * t)) + (255,))
+            d.line([(0, y), (W, y)],
+                   fill=(int(11 + 9 * t), int(15 + 13 * t), int(26 + 18 * t)) + (255,))
         im = im.convert("RGB").convert("RGBA")
-        for (cx, cy, r, col, al, bl) in [(210, 190, 460, (152, 120, 62), 34, 140),
-                                         (890, 1300, 470, (38, 62, 96), 34, 140),
-                                         (512, 660, 320, (122, 100, 60), 13, 150)]:
+        for (cx, cy, r, col, al, bl) in [(190, 150, 470, (156, 124, 66), 40, 150),
+                                         (880, 1330, 500, (36, 58, 92), 30, 160)]:
             _glow(im, cx, cy, r, col, al, bl)
-        ring = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(ring).ellipse([512 - 335, 700 - 335, 512 + 335, 700 + 335],
-                                     outline=p["gold"] + (14,), width=1)
-        im.alpha_composite(ring.filter(ImageFilter.GaussianBlur(0.6)))
+        im = paper_grain(im, fine=10.0, fibers=300, mottle=0.06)
+        # 纸边压深: 让卡牌有一点点"实体边"的暗示
+        edge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ed = ImageDraw.Draw(edge)
+        for i in range(14):
+            a = int(16 * (1 - i / 14.0) ** 1.6)
+            ed.rectangle([i, i, W - 1 - i, H - 1 - i], outline=(0, 0, 0, a), width=1)
+        im.alpha_composite(edge)
     else:  # diorama 立体画框: 深底 + 光轴 + 主体后方暖光
         d = ImageDraw.Draw(im)
         for y in range(H):
@@ -332,6 +352,29 @@ def _metal_hair(im, tpl):
         hd.line([(random.randint(0, W - 300), y), (random.randint(0, W), y)],
                 fill=col + (random.randint(3, 7),), width=1)
     im.alpha_composite(hair)
+
+
+def paper_grain(im, fine=9.0, fibers=220, mottle=0.045, seed=17):
+    """纸张/印刷质感: 细颗粒 + 纸纤维 + 低频云斑。仅用于静态高级感(非发光特效)。"""
+    rng = np.random.default_rng(seed)
+    arr = np.asarray(im.convert("RGB")).astype(np.float32)
+    # 1) 细颗粒(印刷网点感)
+    arr += rng.normal(0, fine, arr.shape).astype(np.float32)
+    # 2) 纸纤维(极低对比的横向短纹)
+    fib = Image.new("L", (W, H), 0)
+    fd = ImageDraw.Draw(fib)
+    for _ in range(fibers):
+        y = random.randint(0, H - 1)
+        x0 = random.randint(0, W - 1)
+        fd.line([(x0, y), (x0 + random.randint(20, 150), y)], fill=random.randint(6, 16), width=1)
+    arr += (np.asarray(fib.filter(ImageFilter.GaussianBlur(0.6))).astype(np.float32)[..., None] - 3.0)
+    # 3) 低频云斑(纸浆不匀)
+    low = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB").convert("L")
+    low = low.resize((max(2, W // 24), max(2, H // 24)), Image.Resampling.BILINEAR)
+    low = low.resize((W, H), Image.Resampling.BICUBIC).filter(ImageFilter.GaussianBlur(6))
+    lo = np.asarray(low).astype(np.float32) - float(np.asarray(low).mean())
+    arr += (lo[..., None] * mottle)
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
 
 
 def _bands(im, p, rects):
@@ -488,45 +531,23 @@ def effects(tpl):
             lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             ImageDraw.Draw(lay).ellipse([x - r, y - r, x + r, y + r], fill=(255, 226, 176, 26))
             im.alpha_composite(lay.filter(ImageFilter.GaussianBlur(10)))
-    else:
-        def clear(x, y):
-            if 1140 < y < 1450:          # 底部文字区不放任何粒子
-                return False
-            return math.hypot((x - 512), (y - 620) / 1.35) > 235 or random.random() < 0.18
-        far = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        fd = ImageDraw.Draw(far)
-        for _ in range(150):
-            x, y = random.randint(20, W - 20), random.randint(20, H - 20)
-            if not clear(x, y):
-                continue
-            r = random.uniform(1.2, 3.4)
-            fd.ellipse([x - r, y - r, x + r, y + r], fill=(255, 246, 224, random.randint(60, 130)))
-        im.alpha_composite(far.filter(ImageFilter.GaussianBlur(0.5)))
-        for _ in range(5):
-            x, y = random.randint(60, W - 60), random.randint(60, H - 60)
-            r = random.uniform(18, 30)
-            lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-            ImageDraw.Draw(lay).ellipse([x - r, y - r, x + r, y + r], fill=(255, 232, 186, 26))
-            im.alpha_composite(lay.filter(ImageFilter.GaussianBlur(9)))
-        for _ in range(10):
-            x, y = random.randint(70, W - 70), random.randint(70, H - 70)
-            if not clear(x, y):
-                continue
+    else:  # night: 极克制的手工装饰 —— 不铺星尘, 只在纸面信息区做几处点缀
+        for (x, y, r, a) in [(104, 1164, 6.0, 195), (890, 1452, 6.0, 175), (512, 1500, 5.0, 150)]:
             g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             gd = ImageDraw.Draw(g)
-            r = random.uniform(8, 16)
-            a = random.randint(160, 215)
-            star4(gd, x, y, r, p["gold"] + (a,), ratio=0.18)
-            star4(gd, x, y, r * 0.42, (255, 250, 235, min(255, a + 35)), ratio=0.5)
-            im.alpha_composite(g.filter(ImageFilter.GaussianBlur(0.6)))
-        for _ in range(22):
-            x, y = random.randint(40, W - 40), random.randint(40, H - 40)
-            if not clear(x, y):
-                continue
-            c = random.choice([p["gold"], p["ink"], p["gold"], p["d"]])
-            ImageDraw.Draw(im).polygon(
-                rot_rect(x, y, random.uniform(3, 5.5), random.uniform(9, 16), random.uniform(0, 180)),
-                fill=c + (random.randint(85, 140),))
+            star4(gd, x, y, r, p["gold"] + (a,), ratio=0.2)
+            star4(gd, x, y, r * 0.4, (255, 250, 235, min(255, a + 25)), ratio=0.5)
+            im.alpha_composite(g.filter(ImageFilter.GaussianBlur(0.5)))
+        dd = ImageDraw.Draw(im)
+        for (x, y, r, a) in [(68, 1206, 2.6, 130), (956, 1206, 2.6, 130)]:
+            dd.ellipse([x - r, y - r, x + r, y + r], fill=p["gold"] + (a,))
+        arc = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(arc).arc([560, 1386, 984, 1584], start=192, end=318,
+                                fill=p["gold"] + (56,), width=1)
+        im.alpha_composite(arc.filter(ImageFilter.GaussianBlur(0.7)))
+        bokeh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(bokeh).ellipse([660, 1210, 960, 1460], fill=(255, 228, 178, 26))
+        im.alpha_composite(bokeh.filter(ImageFilter.GaussianBlur(40)))
     return im
 
 
@@ -542,6 +563,7 @@ def text_layer(tpl, cfg):
     NO = str(cfg.get("edition") or "").strip()
     NAME = str(cfg.get("name") or "").strip()
     AGE = str(cfg.get("age") or "").strip()
+    WISH = str(cfg.get("wish") or "").strip()
     YEAR = (DATE.split(".")[0] if DATE else "")
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
@@ -664,40 +686,38 @@ def text_layer(tpl, cfg):
         if DATE:
             tracked(d, (xr - tw(d, DATE, font(SANS, 26), 2.0), 1250), DATE, font(SANS, 26), p["gold"] + (232,), 2.0)
         tracked(d, (xr - tw(d, NO, font(SANS, 19), 1.4), 1290), NO, font(SANS, 19), (206, 186, 146, 235), 1.4)
-    else:  # night
-        d.rectangle([30, 30, W - 31, H - 31], outline=p["gold"] + (205,), width=2)
-        d.rectangle([46, 46, W - 47, H - 47], outline=p["a"] + (150,), width=1)
-        for (x, y, sx, sy) in [(30, 30, 1, 1), (W - 31, 30, -1, 1), (30, H - 31, 1, -1), (W - 31, H - 31, -1, -1)]:
-            d.line([(x, y), (x + sx * 62, y)], fill=p["gold"] + (170,), width=1)
-            d.line([(x, y), (x, y + sy * 62)], fill=p["gold"] + (170,), width=1)
-            star4(d, x + sx * 78, y + sy * 78, 6.5, p["gold"] + (185,))
-        tracked(d, (W / 2, 150), HB, font(SANS_SB, 26), (232, 217, 181, 238), 11.5, True)
-        star4(d, W / 2, 182, 6, p["gold"] + (210,))
-        d.line([(W / 2 - 150, 182), (W / 2 - 30, 182)], fill=p["gold"] + (120,), width=1)
-        d.line([(W / 2 + 30, 182), (W / 2 + 150, 182)], fill=p["gold"] + (120,), width=1)
-        if NAME:
-            tracked(d, (W / 2, 214), f"FOR {NAME.upper()}", font(SANS, 13), p["gold"] + (190,), 5.0, True)
-        y = 1214
-        for i in range(816):
-            al = int(min(1.0, min(i, 815 - i) / 60.0) * 58)
-            d.point((104 + i, y), fill=p["gold"] + (al,))
+    else:  # night: 高级款排版 —— 上方标题带 / 中部照片带 / 下方信息区, 不含 TCG 式文案
         xl, xr = 104, W - 104
-        if AGE:
-            f = font(SERIF, 182)
-            d.text((xl + 3, 1312 + 3), AGE, font=f, fill=(120, 96, 52, 120), anchor="ls")
-            d.text((xl, 1312), AGE, font=f, fill=(238, 228, 202, 255), anchor="ls")
-            aw = d.textlength(AGE, font=f)
-            star4(d, xl + aw + 30, 1200, 7, p["gold"] + (195,))
-            tracked(d, (xl + 4, 1362), MAIN, font(SERIF, 44), (240, 232, 214, 245), 7.0)
-            if TAG:
-                tracked(d, (xl + 6, 1398), TAG, font(SANS, 16), p["gold"] + (150,), 5.0)
-        else:
-            tracked(d, (xl, 1332), MAIN, font(SERIF, 104), (244, 236, 218, 255), 1.5)
-            if TAG:
-                tracked(d, (xl + 4, 1372), TAG, font(SANS, 17), p["gold"] + (150,), 6.0)
+        # 卡框: 外细线 + 内细线 + 四角短线 + 极小星芒(发丝级, 无霓虹)
+        d.rectangle([30, 30, W - 31, H - 31], outline=p["gold"] + (208,), width=2)
+        d.rectangle([44, 44, W - 45, H - 45], outline=p["a"] + (118,), width=1)
+        for (x, y, sx, sy) in [(30, 30, 1, 1), (W - 31, 30, -1, 1), (30, H - 31, 1, -1), (W - 31, H - 31, -1, -1)]:
+            d.line([(x, y), (x + sx * 58, y)], fill=p["gold"] + (182,), width=1)
+            d.line([(x, y), (x, y + sy * 58)], fill=p["gold"] + (182,), width=1)
+            star4(d, x + sx * 74, y + sy * 74, 5.0, p["gold"] + (170,))
+        # —— 上方标题带 ——
+        if NAME:
+            tracked(d, (W / 2, 62), f"FOR {NAME.upper()}", font(SANS, 12), p["gold"] + (180,), 5.0, True)
+        if HB:
+            tracked(d, (W / 2, 104), HB, font(SANS_SB, 25), (236, 222, 188, 242), 11.0, True)
+        d.line([(xl, 136), (xr, 136)], fill=p["gold"] + (88,), width=1)
+        star4(d, W / 2, 136, 4.2, p["gold"] + (168,))
+        # —— 照片上缘登记线(把这行当作"印刷起点") ——
+        d.line([(0, 150), (W, 150)], fill=p["gold"] + (72,), width=1)
+        # —— 下方信息区: 大数字与右侧信息同处一个视觉带 ——
+        d.line([(xl, 1206), (xr, 1206)], fill=p["gold"] + (76,), width=1)
         if DATE:
-            tracked(d, (xr - tw(d, DATE, font(SANS, 26), 2.0), 1252), DATE, font(SANS, 26), p["gold"] + (228,), 2.0)
-        tracked(d, (xr - tw(d, NO, font(SANS, 19), 1.4), 1292), NO, font(SANS, 19), (176, 160, 128, 235), 1.4)
+            tracked(d, (xr - tw(d, DATE, font(SANS, 25), 2.2), 1290), DATE,
+                    font(SANS, 25), p["gold"] + (226,), 2.2)
+        if NO:
+            tracked(d, (xr - tw(d, NO, font(SANS, 18), 1.6), 1330), NO,
+                    font(SANS, 18), (178, 162, 130, 225), 1.6)
+        if AGE:
+            f = font(SERIF, 176)
+            d.text((xl + 3, 1384 + 3), AGE, font=f, fill=(8, 11, 20, 155), anchor="ls")   # 压印感阴影
+            d.text((xl, 1384), AGE, font=f, fill=(241, 231, 205, 255), anchor="ls")
+        if WISH:
+            tracked(d, (xl + 4, 1432), WISH, font(SANS, 15), (214, 200, 170, 205), 4.5)
     return im
 
 
@@ -707,7 +727,7 @@ def photo_box(tpl):
         "celebration": ((0, 0, 1024, 966), "round_bottom"),
         "soft": ((0, 0, 1024, 1004), "band"),
         "pop": ((0, 0, 1024, 1092), "diagonal"),
-        "night": ((0, 118, 1024, 1232), "band"),
+        "night": ((0, 150, 1024, 1150), "band"),
         "diorama": ((0, 96, 1024, 1180), "band"),
     }[tpl]
 

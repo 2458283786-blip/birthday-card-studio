@@ -287,10 +287,9 @@ def render_back(tpl, cfg):
             _star(d, x, y, 7, S["gold"] + (200,))
     ink, gold = S["ink"] + (255,), S["gold"] + (255,)
     fam = BLACK if style == "pop" else SERIF
-    tracked(d, (512, 250), cfg.get("subtitle") or "HAPPY BIRTHDAY",
-            f(BLACK if style == "pop" else SANS_SB, 26 if style == "pop" else 24), ink, 10, True)
-    tracked(d, (512, 312), cfg.get("edition") or "CARD #0001", f(SANS, 20), gold, 2.4, True)
-    d.line([(432, 348), (592, 348)], fill=(S["ink"] if style == "night" else S["ink"]) + (80,), width=1)
+    # 背面 = 卡牌身份证: 只放 CARD # 与日期(可选 Created/Owned/QR), 不放主题文案
+    tracked(d, (512, 312), cfg.get("edition") or "", f(SANS, 20), gold, 2.4, True)
+    d.line([(432, 348), (592, 348)], fill=S["ink"] + (80,), width=1)
     age = str(cfg.get("age") or "").strip()
     if age:
         wm = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -301,7 +300,7 @@ def render_back(tpl, cfg):
                                 fill=col, anchor="ms")
         im.alpha_composite(wm)
     d = ImageDraw.Draw(im)
-    tracked(d, (512, 900), cfg.get("title") or "YOUR DAY",
+    tracked(d, (512, 900), cfg.get("title") or "",
             f(fam, 86 if style == "pop" else (84 if style == "celebration" else 92)), ink, 2, True)
     _star(d, 512, 940, 5, S["ink"] + (140,))
     d.line([(392, 940), (486, 940)], fill=S["ink"] + (70,), width=1)

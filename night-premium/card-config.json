@@ -1,0 +1,31 @@
+{
+  "subtitle": "HAPPY BIRTHDAY",
+  "title": "",
+  "tagline": "",
+  "technique": "2026.09.09",
+  "edition": "CARD #0001",
+  "wish": "MAY EVERY YEAR BE KIND TO YOU",
+  "age": "20",
+  "name": "",
+  "createdBy": "",
+  "ownedBy": "",
+  "backStyle": "night",
+  "appearance": {
+    "finish": "original",
+    "background": "#080c16"
+  },
+  "material": {
+    "holoEnabled": false,
+    "regions": { "frame": "matte", "text": "matte", "subject": "matte", "background": "matte" },
+    "amounts": { "frame": 0, "text": 0, "subject": 0, "background": 0 }
+  },
+  "parameters": {
+    "subjectScale": 1.0,
+    "subjectDepth": 0.34,
+    "backgroundDepth": -0.3,
+    "effectsDepth": 0.62,
+    "effectsScale": 1.05,
+    "foil": 0
+  },
+  "safeArea": { "scale": 1.0, "offset": [0.0, 0.0] }
+}

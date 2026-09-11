@@ -61,9 +61,9 @@ TEMPLATES = {
 }
 
 BASE_CFG = {
-    "title": "YOUR DAY",
+    "title": "",
     "subtitle": "HAPPY BIRTHDAY",
-    "tagline": "A DAY WORTH KEEPING",
+    "tagline": "",
     "technique": "2026.09.09",
     "edition": "CARD #0001",
     "collection": "BIRTHDAY COLLECTIBLE",
@@ -194,11 +194,8 @@ BACK_JS = r'''function backTexture() {
     [[86, 86], [938, 86], [86, 1450], [938, 1450]].forEach(([x, y]) => star(x, y, 7, "222,201,160,.78"));
   }
   const inkC = S.ink, goldC = S.gold;
-  // 顶部: 主题 + 固定身份
-  tracked(config.subtitle || "HAPPY BIRTHDAY", 512, 250,
-          (config.backStyle === "pop" ? "800 26px Bahnschrift, Arial Black" : "600 24px 'Segoe UI', Arial"),
-          10, inkC);
-  tracked(config.edition || "CARD #0001", 512, 312, "20px 'Segoe UI', Arial", 2.4, goldC);
+  // 背面 = 卡牌身份证: 只放 CARD # 与日期(+可选 Created/Owned/QR), 不放主题文案
+  tracked(config.edition || "", 512, 312, "20px 'Segoe UI', Arial", 2.4, goldC);
   ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.35" : "58,52,44,.28") + ")";
   ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(432, 348); ctx.lineTo(592, 348); ctx.stroke();
   // 年龄水印
@@ -210,7 +207,7 @@ BACK_JS = r'''function backTexture() {
     ctx.font = (config.backStyle === "pop" ? "300px Bahnschrift, Arial Black" : "320px Palatino Linotype, Georgia, serif");
     ctx.textAlign = "center"; ctx.fillText(age, 512, 880); ctx.textAlign = "left";
   }
-  tracked(config.title || "YOUR DAY", 512, 900,
+  tracked(config.title || "", 512, 900,
           (config.backStyle === "pop" ? "800 86px Bahnschrift, Arial Black"
             : config.backStyle === "celebration" ? "84px Palatino Linotype, Georgia, serif"
             : "92px Palatino Linotype, Georgia, serif"), 2, inkC);
