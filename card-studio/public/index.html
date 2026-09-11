@@ -154,35 +154,46 @@ function load(f) {
 }
 
 /* 生成 */
+const val = (id) => (($(id) || {}).value || "").trim();   // 容错取值: 元素不存在也不抛异常
 $("go").onclick = async () => {
   const toDataURL = (blob) => new Promise((r) => {
     const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(blob);
   });
+  if (!chosen) { alert("请先放入一张图片"); return; }
   const payload = {
     imageData: await toDataURL(chosen),
-    title: $("f_title").value.trim(),
-    subtitle: $("f_subtitle").value.trim(),
-    technique: $("f_technique").value.trim(),
-    tagline: $("f_tagline").value.trim(),
-    edition: $("f_edition").value.trim(),
-    collection: $("f_collection").value.trim(),
-    description: $("f_desc").value.trim(),
+    title: val("f_title"),
+    subtitle: val("f_subtitle"),
+    technique: val("f_technique"),
+    tagline: val("f_tagline"),
+    edition: val("f_edition"),
+    collection: val("f_collection"),
+    description: val("f_desc"),
     style: currentStyle,
     mode: currentMode,
     template: currentTemplate,
-    age: ($("f_age") || {}).value || "",
-    wish: ($("f_wish") || {}).value || "",
-    name: ($("f_name") || {}).value || "",
+    age: val("f_age"),
+    wish: val("f_wish"),
+    name: val("f_name"),
     finish: "gold",
   };
-  $("go").disabled = true;
-  const resp = await fetch("/api/generate", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-  });
-  if (!resp.ok) { alert("提交失败: " + (await resp.text())); $("go").disabled = false; return; }
-  $("viewer").style.display = "none";
-  $("log").style.display = "block";
-  startPoll();
+  try {
+    $("go").disabled = true;
+    const resp = await fetch("/api/generate", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      alert("提交失败: " + (await resp.text()));
+      $("go").disabled = false;
+      return;
+    }
+    $("viewer").style.display = "none";
+    $("log").style.display = "block";
+    startPoll();
+  } catch (err) {
+    alert("无法连接工坊服务: " + err + "\n请确认启动窗口还在运行。");
+    $("go").disabled = false;
+  }
 };
 
 /* 轮询任务与日志 */
@@ -235,20 +246,20 @@ async function poll() {
         s.className = "muted"; s.textContent = "导出中…";
         el.querySelector(".row").appendChild(s);
       }
-      // Night 高级款: 直接给静态卡面
-      if (j.template === "night") {
-        const wrap = document.createElement("div");
-        wrap.style.cssText = "display:flex;gap:12px;align-items:center;margin-top:10px";
-        wrap.innerHTML =
-          '<img src="/cardimg/' + j.id + '/static-preview.png" alt="静态卡面" ' +
-          'style="height:190px;border-radius:8px;border:1px solid var(--line);background:#0b0f18" ' +
-          'onerror="this.style.display=\'none\'" />' +
-          '<div class="muted">静态卡面已生成<br/>' +
-          '<a href="/cardimg/' + j.id + '/static.png" target="_blank">正片 PNG</a> · ' +
-          '<a href="/cardimg/' + j.id + '/static-back.png" target="_blank">背面 PNG</a> · ' +
-          '<a href="/cardimg/' + j.id + '/static-preview.png" target="_blank">展示图</a></div>';
-        el.appendChild(wrap);
-      }
+    }
+    // 静态卡面: 一生成好就显示(运行中也能先看, 不必等 3D 流水线)
+    if (j.staticReady) {
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "display:flex;gap:12px;align-items:center;margin-top:10px";
+      wrap.innerHTML =
+        '<img src="/cardimg/' + j.id + '/static-preview.png?t=' + Date.now() + '" alt="静态卡面" ' +
+        'style="height:190px;border-radius:8px;border:1px solid var(--line);background:#0b0f18" ' +
+        'onerror="this.style.display=\'none\'" />' +
+        '<div class="muted">静态卡面' + (j.status === "running" ? "(已可看, 3D 版仍在生成)" : "已生成") + '<br/>' +
+        '<a href="/cardimg/' + j.id + '/static.png" target="_blank">正片 PNG</a> · ' +
+        '<a href="/cardimg/' + j.id + '/static-back.png" target="_blank">背面 PNG</a> · ' +
+        '<a href="/cardimg/' + j.id + '/static-preview.png" target="_blank">展示图</a></div>';
+      el.appendChild(wrap);
     }
     box.appendChild(el);
   });

@@ -185,7 +185,9 @@ async function processJob(job) {
     job.lines.push("[工坊] 素材加工失败(见上方提示)。");
     return;
   }
-  job.lines.push("[工坊] 素材就绪, 开始跑全息流水线(Blender 建场景/导出/组装, 约 1~3 分钟, 日志在命令行窗口)…");
+  job.lines.push("[工坊] 素材就绪, 先生成静态卡面(几秒钟, 可先看效果)…");
+  await runPy([py, "-u", path.join(__dir, "make_static_card.py"), job.dir], ROOT, logPath, push);
+  job.lines.push("[工坊] 开始跑全息流水线(Blender 建场景/导出/组装, 约 1~3 分钟, 日志在命令行窗口)…");
   code = await runPy(
     [py, "-u", path.join(SKILL, "run_pipeline.py"),
      "--project", job.dir, "--blender", BLENDER, "--skip-npm", "--skip-render"],
@@ -305,6 +307,7 @@ const server = http.createServer(async (req, res) => {
       const list = [...jobs.values()].map((j) => ({
         id: j.id, title: j.meta.title, edition: j.meta.edition, style: j.style,
         template: j.template || "studio",
+        staticReady: existsSync(path.join(j.dir, "static-preview.png")),
         status: j.status, created: j.created, last: j.lines.slice(-1)[0] || "",
         export: j.export || null,
       }));

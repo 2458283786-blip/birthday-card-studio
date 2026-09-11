@@ -1,0 +1,24 @@
+{
+  "subtitle": "HAPPY BIRTHDAY",
+  "title": "",
+  "tagline": "",
+  "technique": "2026.09.11",
+  "edition": "CARD #0002",
+  "wish": "STAY STRONG, STAY KIND",
+  "age": "20",
+  "name": "",
+  "createdBy": "",
+  "ownedBy": "",
+  "backStyle": "night",
+  "appearance": { "finish": "pearl", "background": "#080c16" },
+  "material": {
+    "holoEnabled": true,
+    "regions": { "frame": "pearl", "text": "matte", "subject": "pearl", "background": "pearl" },
+    "amounts": { "frame": 0.5, "subject": 0.35, "background": 0.35 }
+  },
+  "parameters": {
+    "subjectScale": 1.0, "subjectDepth": 0.34, "backgroundDepth": -0.3,
+    "effectsDepth": 0.62, "effectsScale": 1.05, "foil": 0.52, "textDepth": 0.55
+  },
+  "safeArea": { "scale": 1.0, "offset": [0.0, 0.0] }
+}

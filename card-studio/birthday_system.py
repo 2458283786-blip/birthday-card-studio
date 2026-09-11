@@ -103,10 +103,14 @@ def photo_layer(src_path, tpl, box, mask_kind):
     """box=(l,t,r,b) 照片可见区域; mask_kind 决定融合方式。保留原图, 不抠图。
     若素材本身带透明通道(透明 PNG), Diorama 会自动切成真·立体抠图模式。"""
     raw = ImageOps.exif_transpose(Image.open(src_path))   # 手机横拍带 EXIF 旋转时必须先摆正
-    if tpl == "diorama" and ("A" in raw.getbands()):
+    if "A" in raw.getbands():
         alpha = raw.convert("RGBA").getchannel("A")
-        if (np.asarray(alpha) < 8).mean() > 0.004:
-            return _diorama_cutout(raw.convert("RGBA"))
+        has_alpha = (np.asarray(alpha) < 8).mean() > 0.004
+        if has_alpha and tpl == "diorama":
+            return _cutout_place(raw.convert("RGBA"), 880, 1010, 700)
+        if has_alpha and tpl == "night":
+            # 透明主体(已抠好的图): 直接浮在卡面上, 保留原透明, 不铺照片带
+            return _cutout_place(raw.convert("RGBA"), 920, 930, 655)
     cfg = {
         "celebration": dict(scale_crop=0.42, bright=1.05, contrast=1.10, sat=1.00, warm=0.05,
                             crush=1.03, lift=0.012, blur=2.2, edge_k=0.55, vig=0.18,
@@ -241,21 +245,29 @@ def photo_layer(src_path, tpl, box, mask_kind):
     return canvas
 
 
-def _diorama_cutout(sub):
-    """素材自带透明通道时的真·立体模式: 主体缩放进卡面 + 投影, 背景见设计底。"""
-    bw, bh = 880, 1010
+def _cutout_place(sub, bw, bh, cy):
+    """透明主体模式: contain 缩放 + 柔和投影 + 底边溶解, 保留原透明(不铺照片带)。"""
     iw, ih = sub.size
     scale = min(bw / iw, bh / ih)
     nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
     sub = sub.resize((nw, nh), Image.Resampling.LANCZOS)
-    x, y = (W - nw) // 2, 700 - nh // 2
+    x, y = (W - nw) // 2, cy - nh // 2
     canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     mask = sub.getchannel("A")
+    # 底边溶解: 抠图常见的"齐边"在这里化开, 像被光吃掉
+    arr = np.asarray(mask).astype(np.float32)
+    yy = np.arange(nh, dtype=np.float32)[:, None]
+    start = nh * 0.86
+    fade = np.clip((nh - yy) / max(nh - start, 1.0), 0, 1) ** 1.3
+    arr = arr * np.clip(fade, 0, 1)
+    mask = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "L")
+    out = sub.copy()
+    out.putalpha(mask)
     sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    sh.paste(Image.new("RGBA", (nw, nh), (0, 0, 0, 200)), (x + 10, y + 26),
-             mask.filter(ImageFilter.GaussianBlur(20)).point(lambda v: int(v * 0.7)))
+    sh.paste(Image.new("RGBA", (nw, nh), (0, 0, 0, 190)), (x + 10, y + 24),
+             mask.filter(ImageFilter.GaussianBlur(22)).point(lambda v: int(v * 0.65)))
     canvas.alpha_composite(sh)
-    canvas.paste(sub, (x, y), mask)
+    canvas.paste(out, (x, y), mask)
     return canvas
 
 
