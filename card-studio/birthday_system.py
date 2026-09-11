@@ -24,6 +24,14 @@ FONTS = r"C:\Windows\Fonts"
 SERIF = os.path.join(FONTS, "pala.ttf")
 SANS = os.path.join(FONTS, "segoeui.ttf")
 SANS_SB = os.path.join(FONTS, "seguisb.ttf")
+# 中文字体(填入中文时自动切换, 否则会渲染成空框)
+CJK_SANS = os.path.join(FONTS, "msyh.ttc")      # 微软雅黑
+CJK_SANS_B = os.path.join(FONTS, "msyhbd.ttc")
+CJK_SERIF = os.path.join(FONTS, "simsun.ttc")   # 宋体
+
+
+def has_cjk(text):
+    return any("\u3400" <= ch <= "\u9fff" or "\uff00" <= ch <= "\uffef" for ch in str(text or ""))
 SANS_BLACK = os.path.join(FONTS, "bahnschrift.ttf")
 ARIAL_BD = os.path.join(FONTS, "arialbd.ttf")
 
@@ -62,6 +70,14 @@ def font(path, size):
         except Exception:
             continue
     raise RuntimeError("no font")
+
+
+def fnt(text, size, kind="sans"):
+    """按文字内容选字体: 含中文自动用雅黑/宋体, 避免空框(tofu)。"""
+    if has_cjk(text):
+        path = {"sans": CJK_SANS, "sansb": CJK_SANS_B, "serif": CJK_SERIF}[kind]
+        return font(path, size)
+    return font({"sans": SANS, "sansb": SANS_SB, "serif": SERIF}[kind], size)
 
 
 def star4(d, cx, cy, r, fill, ratio=0.24):
@@ -574,6 +590,7 @@ def text_layer(tpl, cfg):
     DATE = str(cfg.get("technique") or "").strip()
     NO = str(cfg.get("edition") or "").strip()
     NAME = str(cfg.get("name") or "").strip()
+    TITLE = str(cfg.get("title") or "").strip()
     AGE = str(cfg.get("age") or "").strip()
     WISH = str(cfg.get("wish") or "").strip()
     YEAR = (DATE.split(".")[0] if DATE else "")
@@ -707,11 +724,13 @@ def text_layer(tpl, cfg):
             d.line([(x, y), (x + sx * 58, y)], fill=p["gold"] + (182,), width=1)
             d.line([(x, y), (x, y + sy * 58)], fill=p["gold"] + (182,), width=1)
             star4(d, x + sx * 74, y + sy * 74, 5.0, p["gold"] + (170,))
-        # —— 上方标题带 ——
-        if NAME:
-            tracked(d, (W / 2, 62), f"FOR {NAME.upper()}", font(SANS, 12), p["gold"] + (180,), 5.0, True)
+        # —— 上方标题带 —— (名字优先, 没填名字就用卡名, 保证输入的卡名不会消失)
+        HDR = NAME or TITLE
+        if HDR:
+            tracked(d, (W / 2, 62), f"FOR {HDR.upper()}", fnt(HDR, 12, "sansb"),
+                    p["gold"] + (180,), 5.0, True)
         if HB:
-            tracked(d, (W / 2, 104), HB, font(SANS_SB, 25), (236, 222, 188, 242), 11.0, True)
+            tracked(d, (W / 2, 104), HB, fnt(HB, 25, "sansb"), (236, 222, 188, 242), 11.0, True)
         d.line([(xl, 136), (xr, 136)], fill=p["gold"] + (88,), width=1)
         star4(d, W / 2, 136, 4.2, p["gold"] + (168,))
         # —— 照片上缘登记线(把这行当作"印刷起点") ——
@@ -729,7 +748,7 @@ def text_layer(tpl, cfg):
             d.text((xl + 3, 1384 + 3), AGE, font=f, fill=(8, 11, 20, 155), anchor="ls")   # 压印感阴影
             d.text((xl, 1384), AGE, font=f, fill=(241, 231, 205, 255), anchor="ls")
         if WISH:
-            tracked(d, (xl + 4, 1432), WISH, font(SANS, 15), (214, 200, 170, 205), 4.5)
+            tracked(d, (xl + 4, 1432), WISH, fnt(WISH, 15), (214, 200, 170, 205), 4.5)
     return im
 
 

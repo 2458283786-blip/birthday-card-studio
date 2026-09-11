@@ -31302,25 +31302,158 @@ function backTexture() {
   c.width = 1024;
   c.height = 1536;
   const ctx = c.getContext("2d");
-  ctx.strokeStyle = "#aeb5aa";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(56, 56, 912, 1424);
-  ctx.strokeRect(72, 72, 880, 1392);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#50594e";
-  ctx.font = "500 420px Atelier, Georgia, serif";
-  ctx.fillText((config.title || "A").slice(0, 1), 512, 846);
-  ctx.font = "24px Arial";
-  ctx.fillStyle = "#737b70";
-  ctx.fillText(config.collection || "WHITE ATELIER", 512, 245);
-  ctx.font = '34px "Songti SC", serif';
-  ctx.fillText(config.subtitle || config.title, 512, 1020);
-  ctx.font = "18px Arial";
-  ctx.fillText(config.edition || "ART STUDY", 512, 1337);
+  const S = {
+    celebration: { bg1: "#fbf6ec", bg2: "#f6ecda", ink: "#3a342c", gold: "#c4964a", a1: "#e8796a", a2: "#f6d27a", frame: "thin" },
+    soft: { bg1: "#f7f2ea", bg2: "#efe7da", ink: "#5b5248", gold: "#d8c3a0", a1: "#e8d2ce", a2: "#d8c3a0", frame: "double" },
+    pop: { bg1: "#fffdf6", bg2: "#fff8e6", ink: "#141414", gold: "#ffd400", a1: "#2b4cff", a2: "#ff4b3e", frame: "bold" },
+    night: { bg1: "#0e1526", bg2: "#070a12", ink: "#f0e8d6", gold: "#dec9a0", a1: "#a8874f", a2: "#d9a6a0", frame: "double" },
+    diorama: { bg1: "#0c1424", bg2: "#05070d", ink: "#f2e8d5", gold: "#e8c98a", a1: "#a8763a", a2: "#c4523f", frame: "double" }
+  }[config.backStyle || "night"];
+  const dark = ["night", "diorama"].includes(config.backStyle || "night");
+  const star = (x, y, r, alpha) => {
+    const k = 0.22;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * k, y - r * k);
+    ctx.lineTo(x + r, y);
+    ctx.lineTo(x + r * k, y + r * k);
+    ctx.lineTo(x, y + r);
+    ctx.lineTo(x - r * k, y + r * k);
+    ctx.lineTo(x - r, y);
+    ctx.lineTo(x - r * k, y - r * k);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(" + alpha + ")";
+    ctx.fill();
+  };
+  const tracked = (text, cx, y, fnt, tracking, color) => {
+    ctx.font = fnt;
+    ctx.fillStyle = color;
+    const chars = [...String(text)];
+    const w = chars.reduce((s, ch) => s + ctx.measureText(ch).width, 0) + tracking * (chars.length - 1);
+    let x = cx - w / 2;
+    for (const ch of chars) {
+      ctx.fillText(ch, x, y);
+      x += ctx.measureText(ch).width + tracking;
+    }
+  };
+  const field = (label, y, value) => {
+    if (!value) return;
+    tracked(label, 512, y, "12px 'Segoe UI', Arial", 3.2, "rgba(" + (S.frame === "bold" ? "20,20,20,.62" : "139,132,116,.92") + ")");
+    tracked(value, 512, y + 30, "17px 'Segoe UI', Arial", 1, "rgba(" + (dark ? "232,217,181,.94" : "58,52,44,.9") + ")");
+  };
+  const g = ctx.createLinearGradient(0, 0, 0, 1536);
+  g.addColorStop(0, S.bg1);
+  g.addColorStop(1, S.bg2);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1024, 1536);
+  if (config.backStyle === "pop") {
+    ctx.fillStyle = S.a1;
+    ctx.fillRect(0, 1330, 1024, 206);
+    ctx.fillStyle = S.gold;
+    ctx.fillRect(0, 0, 1024, 46);
+    ctx.fillStyle = S.a2;
+    ctx.fillRect(740, 46, 284, 18);
+  } else if (config.backStyle === "celebration") {
+    const rg = ctx.createRadialGradient(190, 220, 20, 190, 220, 430);
+    rg.addColorStop(0, "rgba(246,210,122,.55)");
+    rg.addColorStop(1, "rgba(246,210,122,0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, 1024, 900);
+    const rg2 = ctx.createRadialGradient(870, 1240, 20, 870, 1240, 420);
+    rg2.addColorStop(0, "rgba(232,121,106,.38)");
+    rg2.addColorStop(1, "rgba(232,121,106,0)");
+    ctx.fillStyle = rg2;
+    ctx.fillRect(400, 800, 624, 736);
+  } else if (dark) {
+    ctx.globalAlpha = 0.055;
+    for (let i = 0; i < 150; i++) {
+      const y = Math.random() * 1536;
+      ctx.strokeStyle = i % 2 ? "#8fa2c4" : "#c9b184";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(Math.random() * 600, y);
+      ctx.lineTo(Math.random() * 400 + 300, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(512, 760, 300, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(222,201,160,.07)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  if (S.frame === "bold") {
+    ctx.strokeStyle = S.ink;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(26, 26, 972, 1484);
+  } else if (S.frame === "thin") {
+    ctx.strokeStyle = "rgba(58,52,44,.85)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(30, 30, 964, 1476);
+    star(62, 62, 8, "232,121,106,.9");
+    star(962, 1474, 8, "246,210,122,.95");
+  } else {
+    ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.80" : "216,195,160,.95") + ")";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(38, 38, 948, 1460);
+    ctx.strokeStyle = "rgba(" + (dark ? "168,135,79,.50" : "216,195,160,.7") + ")";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(56, 56, 912, 1424);
+    [[86, 86], [938, 86], [86, 1450], [938, 1450]].forEach(([x, y]) => star(x, y, 7, "222,201,160,.78"));
+  }
+  const inkC = S.ink, goldC = S.gold;
+  tracked(config.edition || "", 512, 312, "20px 'Segoe UI', Arial", 2.4, goldC);
+  ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.35" : "58,52,44,.28") + ")";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(460, 1113);
-  ctx.lineTo(564, 1113);
+  ctx.moveTo(432, 348);
+  ctx.lineTo(592, 348);
   ctx.stroke();
+  const age = String(config.age || "").trim();
+  if (age) {
+    ctx.fillStyle = dark ? "rgba(222,201,160,.085)" : config.backStyle === "pop" ? "rgba(20,20,20,.07)" : config.backStyle === "celebration" ? "rgba(232,121,106,.12)" : "rgba(216,195,160,.22)";
+    ctx.font = config.backStyle === "pop" ? "300px Bahnschrift, Arial Black" : "320px Palatino Linotype, Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.fillText(age, 512, 880);
+    ctx.textAlign = "left";
+  }
+  tracked(
+    config.title || "",
+    512,
+    900,
+    config.backStyle === "pop" ? "800 86px Bahnschrift, Arial Black" : config.backStyle === "celebration" ? "84px Palatino Linotype, Georgia, serif" : "92px Palatino Linotype, Georgia, serif",
+    2,
+    inkC
+  );
+  star(512, 940, 5, dark ? "222,201,160,.8" : "58,52,44,.5");
+  ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.40" : "58,52,44,.30") + ")";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(392, 940);
+  ctx.lineTo(486, 940);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(538, 940);
+  ctx.lineTo(632, 940);
+  ctx.stroke();
+  if (config.tagline) tracked(config.tagline, 512, 982, "16px 'Segoe UI', Arial", 5.5, "rgba(" + (dark ? "222,201,160,.6" : "58,52,44,.62") + ")");
+  ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.28" : "58,52,44,.22") + ")";
+  ctx.beginPath();
+  ctx.moveTo(372, 1104);
+  ctx.lineTo(652, 1104);
+  ctx.stroke();
+  if (config.name) tracked("FOR " + String(config.name).toUpperCase(), 512, 1150, "16px 'Segoe UI', Arial", 4, inkC);
+  if (config.technique) tracked(config.technique, 512, 1206, "22px 'Segoe UI', Arial", 2, goldC);
+  if (config.wish) tracked(
+    config.wish,
+    512,
+    1258,
+    "italic 21px Palatino Linotype, Georgia, serif",
+    0.6,
+    "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")"
+  );
+  field("CREATED BY", 1330, config.createdBy || "");
+  field("OWNED BY", 1396, config.ownedBy || "");
   return canvasTexture(c);
 }
 function addShadow() {

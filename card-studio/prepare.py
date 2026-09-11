@@ -384,6 +384,7 @@ def main():
         "safeArea": {"scale": 1.12, "offset": [-0.06, -0.085]},
         "_provenance": {"source_image": "assets/source.png",
                         "made_by": "card-studio/prepare.py",
+                        "template": "studio",
                         "style": a.style, "mode": mode, "report": report},
     }
     (root / "card-config.json").write_text(

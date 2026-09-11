@@ -53,6 +53,19 @@ def f(path, size):
         return ImageFont.truetype(SANS, size)
 
 
+def has_cjk(text):
+    return any("\u3400" <= ch <= "\u9fff" or "\uff00" <= ch <= "\uffef" for ch in str(text or ""))
+
+
+def ftext(text, size, kind="sans"):
+    """含中文自动切到雅黑/宋体, 避免空框。"""
+    if has_cjk(text):
+        path = {"sans": FONTS + r"\msyh.ttc", "sansb": FONTS + r"\msyhbd.ttc",
+                "serif": FONTS + r"\simsun.ttc"}[kind]
+        return f(path, size)
+    return f({"sans": SANS, "sansb": SANS_SB, "serif": SERIF}[kind], size)
+
+
 def tracked(d, xy, text, fnt, fill, tracking=0.0, center=False):
     text = str(text)
     ws = [d.textlength(ch, font=fnt) for ch in text]
@@ -291,6 +304,9 @@ def render_back(tpl, cfg):
     # 背面 = 卡牌身份证: 只放 CARD # 与日期(可选 Created/Owned/QR), 不放主题文案
     tracked(d, (512, 312), cfg.get("edition") or "", f(SANS, 20), gold, 2.4, True)
     d.line([(432, 348), (592, 348)], fill=S["ink"] + (80,), width=1)
+    if cfg.get("collection"):
+        tracked(d, (512, 384), cfg["collection"], ftext(cfg["collection"], 13, "sansb"),
+                S["ink"] + (155,), 3.4, True)
     age = str(cfg.get("age") or "").strip()
     if age:
         wm = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -301,21 +317,38 @@ def render_back(tpl, cfg):
                                 fill=col, anchor="ms")
         im.alpha_composite(wm)
     d = ImageDraw.Draw(im)
-    tracked(d, (512, 900), cfg.get("title") or "",
-            f(fam, 86 if style == "pop" else (84 if style == "celebration" else 92)), ink, 2, True)
+    if cfg.get("title"):
+        tracked(d, (512, 900), cfg["title"], ftext(cfg["title"], 86 if style == "pop" else (84 if style == "celebration" else 92), "serif"),
+                ink, 2, True)
     _star(d, 512, 940, 5, S["ink"] + (140,))
     d.line([(392, 940), (486, 940)], fill=S["ink"] + (70,), width=1)
     d.line([(538, 940), (632, 940)], fill=S["ink"] + (70,), width=1)
     if cfg.get("tagline"):
         tracked(d, (512, 982), cfg["tagline"], f(SANS, 16), S["ink"] + (160,), 5.5, True)
+    # 背面描述(有才显示, 自动折行)
+    desc = str(cfg.get("description") or "").strip()
+    if desc:
+        words, line, lines = desc.split(), "", []
+        for wd in words:
+            if len(line) + len(wd) + 1 > 34 and line:
+                lines.append(line)
+                line = wd
+            else:
+                line = (line + " " + wd).strip()
+        if line:
+            lines.append(line)
+        for i, ln in enumerate(lines[:2]):
+            tracked(d, (512, 1046 + i * 26), ln, ftext(ln, 14), S["ink"] + (135,), 1.6, True)
     # 收藏凭证区: Card ID 已在顶部; 其余字段有数据才显示(不留占位)
-    d.line([(372, 1104), (652, 1104)], fill=S["ink"] + (60,), width=1)
+    d.line([(372, 1128), (652, 1128)], fill=S["ink"] + (60,), width=1)
     if cfg.get("name"):
-        tracked(d, (512, 1150), "FOR " + str(cfg["name"]).upper(), f(SANS, 16), ink, 4.0, True)
+        tracked(d, (512, 1150), "FOR " + str(cfg["name"]).upper(), ftext(cfg["name"], 16, "sansb"),
+                ink, 4.0, True)
     if cfg.get("technique"):
         tracked(d, (512, 1206), cfg["technique"], f(SANS, 22), gold, 2.0, True)
     if cfg.get("wish"):
-        tracked(d, (512, 1258), cfg["wish"], f(SERIF, 21), S["ink"] + (190,), 0.6, True)
+        tracked(d, (512, 1258), cfg["wish"], ftext(cfg["wish"], 21, "serif"),
+                S["ink"] + (190,), 0.6, True)
 
     def field(label, y, value):
         if not value:

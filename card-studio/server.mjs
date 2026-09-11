@@ -135,7 +135,10 @@ async function processJob(job) {
       wish: job.meta.wish || "",
       age: job.meta.age || "",
       name: job.meta.name || "",
+      collection: job.meta.collection || "",
+      description: job.meta.description || "",
       createdBy: "", ownedBy: "",
+      _provenance: { template: "night", style: job.style, mode: job.mode },
       backStyle: "night",
       appearance: { finish: "pearl", background: "#080c16" },
       material: {
