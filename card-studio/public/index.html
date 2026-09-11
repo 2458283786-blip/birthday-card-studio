@@ -78,6 +78,11 @@
     </div>
     <div class="muted" style="margin-bottom:12px">五套 Birthday 模板共用一条流程: 纸张/印刷质感 + 排版化构图 + 身份证背面, 并额外产出<b>静态卡面 PNG</b>(正片/背面/展示图)。</div>
     <div class="muted" id="tplHint" style="margin:-6px 0 12px"></div>
+    <div id="tplPreviewWrap" style="margin:0 0 14px;display:none">
+      <img id="tplPreview" alt="模板字段落位图"
+           style="width:100%;max-width:620px;border-radius:10px;border:1px solid var(--line);display:block" />
+      <div class="muted" style="margin-top:6px">图上编号 = 字段在卡面上的落位,右侧图例是字段名(点开图可放大看)</div>
+    </div>
     <label>图片处理方式</label>
     <div class="styles" id="modes" style="margin-bottom:6px">
       <div class="style on" data-v="auto"><span class="sw" style="background:conic-gradient(#f6f1e6,#b8862d,#f6f1e6,#c9b98f,#f6f1e6)"></span>自动判断(推荐)</div>
@@ -158,6 +163,12 @@ function syncTemplateFields() {
     : "当前模板会用到的字段:<b>卡名</b> · 副标题 · 年龄 · 日期 · " +
       (night ? "<b>祝福语</b> · " : (tpl === "pop" ? "" : "一句话 · ")) +
       "名字 · 编号 · 系列名 · 背面描述。背景由模板固定, <b>不受「背景风格」影响</b>。";
+  // 字段落位预览图(经典模板由 skill 自带排版决定, 没有落位图)
+  const wrap = $("tplPreviewWrap");
+  if (wrap) {
+    wrap.style.display = classic ? "none" : "block";
+    if (!classic) $("tplPreview").src = "/tpl/" + tpl + ".png";
+  }
 }
 syncTemplateFields();
 

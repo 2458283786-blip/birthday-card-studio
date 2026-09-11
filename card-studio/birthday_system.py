@@ -604,10 +604,10 @@ def text_layer(tpl, cfg):
             d.line([(x, y), (x, y + sy * 56)], fill=p["ink"] + (165,), width=1)
         star4(d, 96, 96, 8, p["a"] + (215,))
         star4(d, W - 96, H - 96, 8, p["b"] + (235,))
-        tracked(d, (W / 2, 122), HB, font(SANS_SB, 25), (255, 255, 255, 246), 11.5, True,
+        tracked(d, (W / 2, 122), HB, fnt(HB, 31, "sansb"), (255, 255, 255, 246), 11.5, True,
                 shadow=(1, 2, (40, 34, 28, 120)))
         if NAME:
-            tracked(d, (W / 2, 172), f"FOR {NAME.upper()}", font(SANS, 15), (255, 255, 255, 220), 5.0, True,
+            tracked(d, (W / 2, 172), f"FOR {str(NAME).upper()}", fnt(NAME, 20), (255, 255, 255, 220), 5.0, True,
                     shadow=(1, 1, (40, 34, 28, 110)))
         if AGE:
             f = font(SANS_BLACK, 232)
@@ -615,17 +615,17 @@ def text_layer(tpl, cfg):
             d.text((96, 1252), AGE, font=f, fill=p["a"] + (255,), anchor="ls")
             aw = d.textlength(AGE, font=f)
             d.text((96 + aw + 10, 1252 - 128), "TH", font=font(SANS_SB, 48), fill=p["c"] + (255,), anchor="ls")
-            tracked(d, (100, 1316), MAIN, font(SERIF, 54), p["ink"] + (250,), 4.0)
+            tracked(d, (100, 1316), MAIN, fnt(MAIN, 60, "serif"), p["ink"] + (250,), 4.0)
         elif MAIN:                      # 未提供年龄 → 用主标题当 hero; 两者都没有就留白
             tracked(d, (96, 1252), MAIN, font(SERIF, 118), p["ink"] + (250,), 2.0)
         elif YEAR:
             tracked(d, (96, 1252), YEAR, font(SANS_BLACK, 132), p["c"] + (255,), 3.0)
         if TAG:
-            tracked(d, (104, 1364), TAG, font(SANS, 14), p["ink"] + (200,), 5.0)
+            tracked(d, (104, 1364), TAG, fnt(TAG, 19), p["ink"] + (200,), 5.0)
         xr = W - 108
         if DATE:
-            tracked(d, (xr - tw(d, DATE, font(SANS, 25), 2.0), 1300), DATE, font(SANS, 25), p["ink"] + (235,), 2.0)
-        tracked(d, (xr - tw(d, NO, font(SANS, 18), 1.4), 1338), NO, font(SANS, 18), p["ink"] + (215,), 1.4)
+            tracked(d, (xr - tw(d, DATE, fnt(DATE, 29), 2.0), 1300), DATE, fnt(DATE, 29), p["ink"] + (235,), 2.0)
+        tracked(d, (xr - tw(d, NO, fnt(NO, 22), 1.4), 1338), NO, fnt(NO, 22), p["ink"] + (215,), 1.4)
         d.ellipse([xr - 96, 1382, xr - 60, 1418], fill=p["b"] + (255,))
         d.ellipse([xr - 52, 1390, xr - 24, 1418], fill=p["d"] + (255,))
         d.ellipse([xr - 18, 1382, xr + 10, 1410], fill=p["a"] + (255,))
@@ -635,35 +635,35 @@ def text_layer(tpl, cfg):
         d.rectangle([48, 48, W - 49, H - 49], outline=p["gold"] + (120,), width=1)
         for (x, y) in [(34, 34), (W - 35, 34), (34, H - 35), (W - 35, H - 35)]:
             d.ellipse([x - 3, y - 3, x + 3, y + 3], fill=p["gold"] + (220,))
-        tracked(d, (W / 2, 148), HB, font(SANS, 22), (255, 253, 250, 245), 10.0, True,
+        tracked(d, (W / 2, 148), HB, fnt(HB, 28), (255, 253, 250, 245), 10.0, True,
                 shadow=(1, 1, (90, 80, 70, 110)))
         if NAME:
-            tracked(d, (W / 2, 190), f"FOR {NAME.upper()}", font(SANS, 13), (255, 253, 250, 225), 4.5, True,
+            tracked(d, (W / 2, 190), f"FOR {str(NAME).upper()}", fnt(NAME, 18), (255, 253, 250, 225), 4.5, True,
                     shadow=(1, 1, (90, 80, 70, 100)))
         cx, cy, r = 178, 1252, 76
         d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=p["gold"] + (190,), width=1)
         if AGE:
             d.text((cx, cy + 30), AGE, font=font(SERIF, 84), fill=p["gold"] + (250,), anchor="ms")
-            tracked(d, (cx, cy + 52), "YEARS", font(SANS, 11), p["gold"] + (190,), 3.0, True)
+            tracked(d, (cx, cy + 52), "YEARS", font(SANS, 14), p["gold"] + (190,), 3.0, True)
         d.line([(296, 1150), (296, 1420)], fill=p["gold"] + (150,), width=1)
-        tracked(d, (340, 1236), MAIN, font(SERIF, 66), p["ink"] + (250,), 2.0)
+        tracked(d, (340, 1236), MAIN, fnt(MAIN, 72, "serif"), p["ink"] + (250,), 2.0)
         if TAG:
-            tracked(d, (344, 1284), TAG, font(SANS, 13), p["ink"] + (185,), 5.0)
+            tracked(d, (344, 1284), TAG, fnt(TAG, 18), p["ink"] + (185,), 5.0)
         if DATE:
-            tracked(d, (344, 1336), DATE, font(SANS, 22), p["ink"] + (220,), 2.0)
-        tracked(d, (344, 1374), NO, font(SANS, 17), p["ink"] + (200,), 1.4)
+            tracked(d, (344, 1336), DATE, fnt(DATE, 26), p["ink"] + (220,), 2.0)
+        tracked(d, (344, 1374), NO, fnt(NO, 21), p["ink"] + (200,), 1.4)
         star4(d, W - 120, 1252, 8, p["gold"] + (170,))
 
     elif tpl == "pop":
         d.rectangle([20, 20, W - 21, H - 21], outline=p["ink"] + (235,), width=3)
-        tracked(d, (72, 132), HB, font(SANS_BLACK, 30), p["ink"] + (255,), 10.0)
+        tracked(d, (72, 132), HB, fnt(HB, 35, "sansb"), p["ink"] + (255,), 10.0)
         if AGE:
             f = font(SANS_BLACK, 296)
             d.text((76 + 7, 1240 + 7), AGE, font=f, fill=p["b"] + (255,), anchor="ls")
             d.text((76, 1240), AGE, font=f, fill=p["ink"] + (255,), anchor="ls")
             aw = d.textlength(AGE, font=f)
             d.text((76 + aw + 8, 1240 - 168), "TH", font=font(SANS_BLACK, 62), fill=p["c"] + (255,), anchor="ls")
-            tracked(d, (82, 1300), MAIN, font(SANS_BLACK, 38), p["ink"] + (255,), 6.0)
+            tracked(d, (82, 1300), MAIN, fnt(MAIN, 44, "sansb"), p["ink"] + (255,), 6.0)
         elif MAIN:                      # 无年龄: 主标题当字标; 只有日期就显示年份
             tracked(d, (76, 1240), MAIN, font(SANS_BLACK, 116), p["ink"] + (255,), 2.0)
             if YEAR:
@@ -671,14 +671,14 @@ def text_layer(tpl, cfg):
         elif YEAR:
             tracked(d, (76, 1240), YEAR, font(SANS_BLACK, 116), p["ink"] + (255,), 2.0)
         if NAME:
-            tracked(d, (84, 1352), f"FOR {NAME.upper()}", font(SANS_SB, 20), p["ink"] + (235,), 3.0)
+            tracked(d, (84, 1352), f"FOR {str(NAME).upper()}", fnt(NAME, 24, "sansb"), p["ink"] + (235,), 3.0)
         xr = W - 80
-        pill_w = tw(d, NO, font(SANS_BLACK, 18), 1.2) + 40
+        pill_w = tw(d, NO, fnt(NO, 22, "sansb"), 1.2) + 44
         d.rounded_rectangle([xr - pill_w, 1412, xr, 1456], radius=22, fill=p["ink"] + (255,))
-        tracked(d, (xr - pill_w + 20, 1430), NO, font(SANS_BLACK, 18), (255, 255, 255, 255), 1.2)
+        tracked(d, (xr - pill_w + 20, 1430), NO, fnt(NO, 22, "sansb"), (255, 255, 255, 255), 1.2)
         if DATE:
-            tracked(d, (xr - tw(d, DATE, font(SANS_BLACK, 22), 1.6), 1382), DATE,
-                    font(SANS_BLACK, 22), p["ink"] + (255,), 1.6)
+            tracked(d, (xr - tw(d, DATE, fnt(DATE, 26, "sansb"), 1.6), 1382), DATE,
+                    fnt(DATE, 26, "sansb"), p["ink"] + (255,), 1.6)
 
     elif tpl == "diorama":
         # 双线暖金框 + 四角星芒
@@ -688,12 +688,12 @@ def text_layer(tpl, cfg):
             d.line([(x, y), (x + sx * 64, y)], fill=p["gold"] + (185,), width=1)
             d.line([(x, y), (x, y + sy * 64)], fill=p["gold"] + (185,), width=1)
             star4(d, x + sx * 82, y + sy * 82, 7, p["gold"] + (200,))
-        tracked(d, (W / 2, 152), HB, font(SANS_SB, 26), (242, 232, 213, 240), 11.5, True)
+        tracked(d, (W / 2, 152), HB, fnt(HB, 31, "sansb"), (242, 232, 213, 240), 11.5, True)
         star4(d, W / 2, 184, 6, p["gold"] + (215,))
         d.line([(W / 2 - 152, 184), (W / 2 - 32, 184)], fill=p["gold"] + (130,), width=1)
         d.line([(W / 2 + 32, 184), (W / 2 + 152, 184)], fill=p["gold"] + (130,), width=1)
         if NAME:
-            tracked(d, (W / 2, 216), f"FOR {NAME.upper()}", font(SANS, 13), p["gold"] + (195,), 5.0, True)
+            tracked(d, (W / 2, 216), f"FOR {str(NAME).upper()}", fnt(NAME, 18), p["gold"] + (195,), 5.0, True)
         y = 1210
         for i in range(816):
             al = int(min(1.0, min(i, 815 - i) / 60.0) * 62)
@@ -705,16 +705,16 @@ def text_layer(tpl, cfg):
             d.text((xl, 1310), AGE, font=f, fill=(240, 220, 178, 255), anchor="ls")
             aw = d.textlength(AGE, font=f)
             star4(d, xl + aw + 32, 1196, 7.5, p["gold"] + (205,))
-            tracked(d, (xl + 4, 1364), MAIN, font(SERIF, 48), (242, 232, 213, 248), 6.5)
+            tracked(d, (xl + 4, 1364), MAIN, fnt(MAIN, 55, "serif"), (242, 232, 213, 248), 6.5)
             if TAG:
-                tracked(d, (xl + 6, 1400), TAG, font(SANS, 16), p["gold"] + (155,), 5.0)
+                tracked(d, (xl + 6, 1400), TAG, fnt(TAG, 20), p["gold"] + (155,), 5.0)
         else:
             tracked(d, (xl, 1332), MAIN, font(SERIF, 100), (242, 232, 213, 255), 1.5)
             if TAG:
                 tracked(d, (xl + 4, 1372), TAG, font(SANS, 16), p["gold"] + (155,), 6.0)
         if DATE:
-            tracked(d, (xr - tw(d, DATE, font(SANS, 26), 2.0), 1250), DATE, font(SANS, 26), p["gold"] + (232,), 2.0)
-        tracked(d, (xr - tw(d, NO, font(SANS, 19), 1.4), 1290), NO, font(SANS, 19), (206, 186, 146, 235), 1.4)
+            tracked(d, (xr - tw(d, DATE, fnt(DATE, 30), 2.0), 1250), DATE, fnt(DATE, 30), p["gold"] + (232,), 2.0)
+        tracked(d, (xr - tw(d, NO, fnt(NO, 23), 1.4), 1290), NO, fnt(NO, 23), (206, 186, 146, 235), 1.4)
     else:  # night: 高级款排版 —— 上方标题带 / 中部照片带 / 下方信息区, 不含 TCG 式文案
         xl, xr = 104, W - 104
         # 卡框: 外细线 + 内细线 + 四角短线 + 极小星芒(发丝级, 无霓虹)
@@ -727,10 +727,10 @@ def text_layer(tpl, cfg):
         # —— 上方标题带 —— (名字优先, 没填名字就用卡名, 保证输入的卡名不会消失)
         HDR = NAME or TITLE
         if HDR:
-            tracked(d, (W / 2, 62), f"FOR {HDR.upper()}", fnt(HDR, 12, "sansb"),
+            tracked(d, (W / 2, 62), f"FOR {HDR.upper()}", fnt(HDR, 18, "sansb"),
                     p["gold"] + (180,), 5.0, True)
         if HB:
-            tracked(d, (W / 2, 104), HB, fnt(HB, 25, "sansb"), (236, 222, 188, 242), 11.0, True)
+            tracked(d, (W / 2, 104), HB, fnt(HB, 31, "sansb"), (236, 222, 188, 242), 11.0, True)
         d.line([(xl, 136), (xr, 136)], fill=p["gold"] + (88,), width=1)
         star4(d, W / 2, 136, 4.2, p["gold"] + (168,))
         # —— 照片上缘登记线(把这行当作"印刷起点") ——
@@ -738,17 +738,17 @@ def text_layer(tpl, cfg):
         # —— 下方信息区: 大数字与右侧信息同处一个视觉带 ——
         d.line([(xl, 1206), (xr, 1206)], fill=p["gold"] + (76,), width=1)
         if DATE:
-            tracked(d, (xr - tw(d, DATE, font(SANS, 25), 2.2), 1290), DATE,
-                    font(SANS, 25), p["gold"] + (226,), 2.2)
+            tracked(d, (xr - tw(d, DATE, font(SANS, 29), 2.2), 1290), DATE,
+                    font(SANS, 29), p["gold"] + (226,), 2.2)
         if NO:
-            tracked(d, (xr - tw(d, NO, font(SANS, 18), 1.6), 1330), NO,
-                    font(SANS, 18), (178, 162, 130, 225), 1.6)
+            tracked(d, (xr - tw(d, NO, font(SANS, 22), 1.6), 1330), NO,
+                    font(SANS, 22), (178, 162, 130, 225), 1.6)
         if AGE:
             f = font(SERIF, 176)
             d.text((xl + 3, 1384 + 3), AGE, font=f, fill=(8, 11, 20, 155), anchor="ls")   # 压印感阴影
             d.text((xl, 1384), AGE, font=f, fill=(241, 231, 205, 255), anchor="ls")
         if WISH:
-            tracked(d, (xl + 4, 1432), WISH, fnt(WISH, 15), (214, 200, 170, 205), 4.5)
+            tracked(d, (xl + 4, 1432), WISH, fnt(WISH, 19), (214, 200, 170, 205), 4.5)
     return im
 
 

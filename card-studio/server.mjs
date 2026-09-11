@@ -356,6 +356,12 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ lines: job.lines }));
     }
 
+    // 模板字段落位预览图
+    const tplImg = p.match(/^\/tpl\/([a-z]+)\.png$/);
+    if (tplImg && req.method === "GET") {
+      return serveStatic(req, res, path.join(__dir, "template-previews"), tplImg[1] + ".png");
+    }
+
     // 项目内的静态卡面图(白名单)
     const img = p.match(/^\/cardimg\/([a-z0-9-]+)\/([a-z0-9._-]+)$/i);
     if (img && req.method === "GET") {
