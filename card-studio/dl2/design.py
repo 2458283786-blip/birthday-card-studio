@@ -344,6 +344,198 @@ def render_editorial(photo, dna, occ, spec, out_path=None):
     return out
 
 
+# ================================================================ CINEMA
+def cinematic_grade(im, dna):
+    """电影调色: 冷阴影 + 暖高光 + S 曲线 + 轻微去饱和(全部由照片自身决定)。"""
+    a = np.asarray(im).astype(np.float32) / 255.0
+    lum = a.mean(2, keepdims=True)
+    cool, warm = np.array([0.955, 0.995, 1.065]), np.array([1.045, 1.0, 0.955])
+    a = a * (cool * (1 - lum) + warm * lum)
+    k = 1.14 if dna["tone"]["contrast"] < 0.22 else 1.07
+    a = np.clip((a - 0.5) * k + 0.5, 0, 1)
+    a = np.clip(a, 0, 1) ** 1.05
+    g = a.mean(2, keepdims=True)
+    sat = 0.90 if dna["color"]["saturation"] > 0.40 else 0.96
+    a = g + (a - g) * sat
+    return Image.fromarray(np.clip(a * 255, 0, 255).astype(np.uint8), "RGB")
+
+
+def _band_lum(im, band):
+    y0, y1 = int(band["y0"] * im.height), int(band["y1"] * im.height)
+    seg = np.asarray(im.convert("L"))[y0:y1]
+    return float(seg.mean() / 255.0) if seg.size else 0.5
+
+
+def plan_cinema(im, dna, occ, info):
+    """照片铺满(80~100%), 上下细黑带做电影画框; 文字压在**又干净又够暗**的一侧。"""
+    cands = clean_bands(occ, bands=(0.0, 0.46), height=0.34)
+    for b in cands:                       # 压浅色字需要偏暗的底, 否则白字会糊在亮天空上
+        lum = _band_lum(im, b)
+        b["lum"] = round(lum, 3)
+        b["score"] = (1 - b["occupancy"]) * 0.6 + (1.0 if lum < 0.45 else 0.18) * 0.4
+    band = max(cands, key=lambda b: b["score"])
+    spec = {
+        "id": "C1", "name": "full-frame", "lang": "cinema",
+        "photo": [0, 0, W, H], "band": band, "bars": 58,
+        "palette": palette(dna),
+        "hero": str(info.get("age") or info.get("title") or info.get("year") or "").strip(),
+        "meta": [str(info.get("edition") or "").strip(), str(info.get("technique") or "").strip()],
+        "name": str(info.get("name") or "").strip(),
+        "score": round(0.55 + 0.45 * band["score"], 3),
+        "tone": {"shadow": dna["tone"]["shadow"], "midtone": dna["tone"]["midtone"],
+                 "highlight": dna["tone"]["highlight"]},
+    }
+    return spec
+
+
+def render_cinema(im, dna, occ, spec, out_path=None):
+    pal = spec["palette"]
+    crop = subject_crop_box(im, dna, W / H)
+    body = im.crop(crop).resize((W, H), Image.Resampling.LANCZOS)
+    body = cinematic_grade(body, dna)
+    canvas = body.convert("RGBA")
+
+    # 暗角(电影感) + 颗粒
+    yy, xx = np.mgrid[0:H, 0:W]
+    dd = np.sqrt(((xx - W / 2) / (W / 2)) ** 2 + ((yy - H / 2) / (H / 2)) ** 2)
+    vig = 1.0 - np.clip((dd - 0.35) / 0.95, 0, 1) ** 1.5 * 0.42
+    a = np.asarray(canvas.convert("RGB")).astype(np.float32) * vig[..., None]
+    a += np.random.default_rng(5).normal(0, 3.0, a.shape)
+    canvas = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+
+    # letterbox 上下细带(用照片的阴影色, 不是死黑)
+    bar = hexc(mix(pal["photo_dark"], (0, 0, 0), 0.55), 244)
+    d = ImageDraw.Draw(canvas, "RGBA")
+    d.rectangle([0, 0, W, spec["bars"]], fill=bar)
+    d.rectangle([0, H - spec["bars"], W, H], fill=bar)
+
+    # 边缘锚定的电影渐变: 从卡片上/下边缘向内压暗, 保证浅色字一定可读
+    y0, y1 = int(spec["band"]["y0"] * H), int(spec["band"]["y1"] * H)
+    top_side = y0 < H / 2
+    scrim = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(scrim)
+    steps = 150
+    span = y1 if top_side else (H - y0)
+    for i in range(steps):
+        t = i / steps
+        yy = int(span * t) if top_side else int(H - span * t)
+        sd.line([(0, yy), (W, yy)],
+                fill=hexc(mix(pal["photo_dark"], (0, 0, 0), 0.5), int(96 + 150 * (t ** 0.85))))
+    canvas.alpha_composite(scrim.filter(ImageFilter.GaussianBlur(30)))
+
+    # 先算文字位置(暗垫需要用到)
+    ink = hexc(mix(pal["paper"], (255, 255, 255), 0.8))
+    shadow = hexc((0, 0, 0), 105)
+    hero = spec["hero"]
+    base_y = int(y0 + (y1 - y0) * (0.74 if top_side else 0.34))
+
+    # 文字后方再加一块"暗垫"(只覆盖文字区, 大模糊 → 看起来是光影而不是色块)
+    pad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    pd = ImageDraw.Draw(pad)
+    pd.rounded_rectangle([56, base_y - 206, W - 56, base_y + 92], radius=40,
+                         fill=hexc(mix(pal["photo_dark"], (0, 0, 0), 0.55), 152))
+    canvas.alpha_composite(pad.filter(ImageFilter.GaussianBlur(46)))
+
+    if hero:
+        hf = fnt(hero, 196, "sansb") if not has_cjk(hero) else fnt(hero, 140, "sansb")
+        d.text((94, base_y + 3), hero, font=hf, fill=shadow)
+        tracked(d, (92, base_y), hero, hf, ink, 6.0)
+    if spec["name"]:
+        tracked(d, (96, base_y + 44), spec["name"].upper(), fnt(spec["name"], 19, "sansb"), ink, 5.0)
+    for i, m in enumerate([m for m in spec["meta"] if m]):
+        f = fnt(m, 26 if i == 0 else 20, "sans")
+        w = d.textlength(m, font=f) + (2.4 if i == 0 else 1.8) * max(0, len(m) - 1)
+        tracked(d, (W - 92 - w + 2, base_y - 4 + i * 38 + 2), m, f, shadow, 2.4 if i == 0 else 1.8)
+        tracked(d, (W - 92 - w, base_y - 4 + i * 38), m, f, ink, 2.4 if i == 0 else 1.8)
+    out = canvas.convert("RGB")
+    if out_path:
+        out.save(out_path)
+    return out
+
+
+# ================================================================ MEMORY
+HW = FONTS + r"\Inkfree.ttf"
+
+
+def plan_memory(im, dna, occ, info):
+    """相册/日记: 主照片 + 放大的低透明度 echo + 极淡轮廓; 装饰尽量来自照片本身。"""
+    lower = occ[int(occ.shape[0] * 0.62):].mean()
+    m2 = 0.62 + 0.35 * (1 - lower)
+    spec = {
+        "id": "M1", "name": "album-plate", "lang": "memory",
+        "photo": [0, 0, int(W * 0.74), int(H * 0.52)], "tilt": -1.4,
+        "echo_scale": 1.42, "echo_alpha": 0.075,
+        "palette": palette(dna),
+        "hero": str(info.get("age") or info.get("title") or info.get("year") or "").strip(),
+        "date": str(info.get("technique") or "").strip(),
+        "meta": [str(info.get("edition") or "").strip()],
+        "name": str(info.get("name") or "").strip(),
+        "score": round(max(0.62, min(0.95, m2)), 3),
+    }
+    return spec
+
+
+def _shadow_plate(w, h, radius=6, blur=18, alpha=120, offset=14):
+    sh = Image.new("RGBA", (w + offset * 2, h + offset * 2), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rectangle([offset, offset, offset + w, offset + h], fill=(12, 10, 9, alpha))
+    return sh.filter(ImageFilter.GaussianBlur(blur)), offset
+
+
+def render_memory(im, dna, occ, spec, out_path=None):
+    pal = spec["palette"]
+    paper_col = mix(mix(pal["paper"], pal["bright"] if "bright" in pal else pal["paper"], 0.2),
+                    (250, 246, 238), 0.35)
+    canvas = _paper(color=paper_col, grain=4.2, seed=23)
+    d = ImageDraw.Draw(canvas, "RGBA")
+
+    px, py, pw, ph = spec["photo"]
+    x0 = 92
+    y0 = int(H * 0.20)
+    # ---- Photo Echo: 放大的低透明度同图 + 极淡轮廓 ----
+    echo = im.crop(subject_crop_box(im, dna, 1.0)).resize(
+        (int(pw * spec["echo_scale"]), int(ph * spec["echo_scale"])), Image.Resampling.LANCZOS)
+    echo = echo.filter(ImageFilter.GaussianBlur(2.2)).convert("RGBA")
+    ea = np.asarray(echo).astype(np.float32)
+    ea[..., 3] = 255 * spec["echo_alpha"]
+    echo = Image.fromarray(ea.astype(np.uint8), "RGBA").rotate(1.0, expand=True)
+    canvas.alpha_composite(echo, (x0 - int(pw * 0.2), y0 - int(ph * 0.14)))
+
+    # ---- 主照片(轻微倾斜 + 投影) ----
+    body = im.crop(subject_crop_box(im, dna, pw / ph)).resize((pw, ph), Image.Resampling.LANCZOS)
+    body = body.rotate(spec["tilt"], expand=True, resample=Image.Resampling.BICUBIC)
+    # 投影用照片自身的剪影(跟着旋转), 否则会出现一圈黑矩形边框
+    sh = Image.new("RGBA", body.size, (10, 9, 8, 255))
+    sh.putalpha(body.getchannel("A").point(lambda v: int(v * 0.55)) if body.mode == "RGBA"
+                else Image.new("L", body.size, 150))
+    canvas.alpha_composite(sh.filter(ImageFilter.GaussianBlur(15)), (x0 + 7, y0 + 17))
+    canvas.alpha_composite(body.convert("RGBA"), (x0, y0))
+    # 轮廓/边缘信息(照片自身的边缘色, 极淡)
+    d.rectangle([x0 - 1, y0 - 1, x0 + body.width, y0 + body.height],
+                outline=hexc(mix(pal["photo_dark"], pal["paper"], 0.35), 120), width=1)
+
+    # ---- 手写日期 + 元信息 ----
+    dy = y0 + body.height + 26
+    if spec["date"]:
+        d.text((x0 + 6, dy), spec["date"], font=font(HW, 46), fill=hexc(pal["ink"], 205))
+    if spec["name"]:
+        tracked(d, (x0 + 8, dy + 54), spec["name"].upper(), fnt(spec["name"], 18, "sansb"),
+                hexc(pal["ink"], 200), 4.0)
+    # ---- hero 数字(右侧留白) ----
+    if spec["hero"]:
+        hf = fnt(spec["hero"], 150, "serif") if not has_cjk(spec["hero"]) else fnt(spec["hero"], 110, "serif")
+        d.text((W - 92, int(H * 0.78)), spec["hero"], font=hf, fill=hexc(pal["ink"], 232), anchor="rs")
+    for i, m in enumerate([m for m in spec["meta"] if m]):
+        f = fnt(m, 22, "sans")
+        w = d.textlength(m, font=f) + 1.6 * max(0, len(m) - 1)
+        tracked(d, (W - 92 - w, int(H * 0.845) + i * 34), m, f, hexc(pal["ink"], 190), 1.6)
+    d.line([(92, int(H * 0.90)), (W - 92, int(H * 0.90))],
+           fill=hexc(mix(pal["accent"], pal["paper"], 0.45), 190), width=2)
+    out = canvas.convert("RGB")
+    if out_path:
+        out.save(out_path)
+    return out
+
+
 # ---------------------------------------------------------------- CLI
 def build(photo_path, info, lang="editorial", out_dir="dl2/out"):
     path = Path(photo_path)
@@ -353,10 +545,18 @@ def build(photo_path, info, lang="editorial", out_dir="dl2/out"):
     if deg:
         im = im.rotate(-deg, expand=True)
     occ = occupancy(im, dna)
-    spec = plan_editorial(im, dna, occ, info)
+    if lang == "cinema":
+        spec = plan_cinema(im, dna, occ, info)
+        render = render_cinema
+    elif lang == "memory":
+        spec = plan_memory(im, dna, occ, info)
+        render = render_memory
+    else:
+        spec = plan_editorial(im, dna, occ, info)
+        render = render_editorial
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     out = Path(out_dir) / f"{path.stem}-{lang}.png"
-    render_editorial(im, dna, occ, spec, out)
+    render(im, dna, occ, spec, out)
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     (Path(out_dir) / f"{path.stem}-{lang}.json").write_text(
         json.dumps({k: spec[k] for k in spec if k != "palette"} |
@@ -377,8 +577,9 @@ def main():
     a = ap.parse_args()
     info = {"age": a.age, "technique": a.date, "edition": a.edition, "name": a.name, "title": a.title}
     out, spec = build(a.photo, info, a.lang)
-    print(f"{Path(a.photo).name}: 版式 {spec['id']}({spec['name']}) score={spec['score']} "
-          f"候选={spec['all_scores']}{' [兜底]' if spec.get('fallback') else ''} → {out}")
+    extra = f" 候选={spec['all_scores']}" if "all_scores" in spec else ""
+    print(f"{Path(a.photo).name}: [{spec.get('lang')}] {spec['id']}({spec['name']}) "
+          f"score={spec['score']}{extra}{' [兜底]' if spec.get('fallback') else ''} → {out}")
 
 
 if __name__ == "__main__":
