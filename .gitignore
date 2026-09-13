@@ -19,3 +19,7 @@ node_modules/
 # 仓库设为 private 且你同意时, 注释掉下面两行即可一并提交:
 demo-birthday/
 birthday-set/
+
+# DL2 验收照片与 AI 分析缓存(含真人, 不入公开仓库)
+dl2/photos/
+dl2/**/_ai-analysis.json
