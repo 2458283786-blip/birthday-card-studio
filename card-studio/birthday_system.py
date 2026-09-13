@@ -56,6 +56,23 @@ PALETTE = {
                 "d": (120, 96, 52), "soft": (16, 26, 46)},
 }
 NAVY = np.array([0.039, 0.059, 0.110], dtype=np.float32)
+BASE_OVERRIDE = None          # 卡牌底色覆盖(appearance.base), 16 进制字符串
+
+
+def _hex_rgb(h):
+    h = str(h or "").strip().lstrip("#")
+    if len(h) != 6:
+        return None
+    try:
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        return None
+
+
+def set_base_color(hexstr):
+    """设置卡牌底色覆盖值; 传空则清除。"""
+    global BASE_OVERRIDE
+    BASE_OVERRIDE = _hex_rgb(hexstr)
 CREAM = np.array([0.984, 0.965, 0.925], dtype=np.float32)
 
 
@@ -148,6 +165,9 @@ def photo_layer(src_path, tpl, box, mask_kind):
                         fade_to=np.array([0.031, 0.043, 0.078], dtype=np.float32),
                         fade_bottom=0.34, fade_top=0.06, grain=0.006),
     }[tpl]
+    if tpl == "night" and BASE_OVERRIDE:          # 照片渐隐目标色跟随底色(避免残留"深蓝味")
+        cfg = dict(cfg)
+        cfg["fade_to"] = np.array([c / 255.0 for c in BASE_OVERRIDE], dtype=np.float32)
 
     l, t, r, b = box
     pw, ph = r - l, b - t
@@ -318,10 +338,15 @@ def background(tpl):
     elif tpl == "night":
         # 高级款底色: 深蓝黑纸基 + 左上暖光 + 右下冷补光, 再做纸张质感
         d = ImageDraw.Draw(im)
+        base_rgb = BASE_OVERRIDE                      # 由 appearance.base 决定, 缺省为原深蓝黑
         for y in range(H):
             t = y / H
-            d.line([(0, y), (W, y)],
-                   fill=(int(11 + 9 * t), int(15 + 13 * t), int(26 + 18 * t)) + (255,))
+            if base_rgb:
+                f = 1.12 - 0.34 * t                       # 上端受光略亮, 下端压深
+                fill = tuple(min(255, int(c * f)) for c in base_rgb) + (255,)
+            else:
+                fill = (int(11 + 9 * t), int(15 + 13 * t), int(26 + 18 * t)) + (255,)
+            d.line([(0, y), (W, y)], fill=fill)
         im = im.convert("RGB").convert("RGBA")
         for (cx, cy, r, col, al, bl) in [(190, 150, 470, (156, 124, 66), 40, 150),
                                          (880, 1330, 500, (36, 58, 92), 30, 160)]:
@@ -775,6 +800,9 @@ def main():
     cp = proj / "card-config.json"
     if cp.exists():
         cfg = json.loads(cp.read_text(encoding="utf8"))
+    set_base_color((cfg.get("appearance") or {}).get("base"))   # 底色可由配置覆盖
+    if BASE_OVERRIDE:
+        log(f"底色覆盖: #{BASE_OVERRIDE[0]:02x}{BASE_OVERRIDE[1]:02x}{BASE_OVERRIDE[2]:02x}")
 
     ImageOps.exif_transpose(Image.open(photo)).convert("RGB").save(out / "source.png")
     box, kind = photo_box(tpl)
