@@ -85,35 +85,132 @@ def _temp_sat(bgr):
 def _faces(bgr):
     gray = cv2.equalizeHist(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY))
     h, w = gray.shape[:2]
-    ms = (int(min(h, w) * 0.05),) * 2
+    ms = max(24, int(min(h, w) * 0.035))
     casc = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     prof = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_profileface.xml")
-    got = list(casc.detectMultiScale(gray, 1.12, 5, minSize=ms))
-    got += list(prof.detectMultiScale(gray, 1.12, 5, minSize=ms))
-    return [[int(v) for v in f] for f in got]      # x, y, w, h
+    got = [tuple(int(v) for v in f) for f in casc.detectMultiScale(gray, 1.1, 6, minSize=(ms, ms))]
+    got += [tuple(int(v) for v in f) for f in prof.detectMultiScale(gray, 1.1, 6, minSize=(ms, ms))]
+    if not got:                                   # 远景小脸: 放大 1.6× 再试
+        up = cv2.resize(gray, None, fx=1.6, fy=1.6, interpolation=cv2.INTER_CUBIC)
+        for (x, y, fw, fh) in casc.detectMultiScale(up, 1.1, 6, minSize=(int(ms * 1.6),) * 2):
+            got.append((int(x / 1.6), int(y / 1.6), int(fw / 1.6), int(fh / 1.6)))
+    # 只挡真正离谱的框(半张图 / 极端长条), 正常近景大脸要保留
+    lim = 0.72 * min(h, w)
+    keep = [[x, y, fw, fh] for (x, y, fw, fh) in got
+            if fw <= lim and fh <= lim and 0.5 <= fw / float(fh) <= 2.0 and fw > 12 and fh > 12]
+    keep.sort(key=lambda b: -(b[2] * b[3]))
+    out = []
+    for b in keep:                                # 重叠去重, 保留更大的框
+        dup = False
+        for o in out:
+            ix = min(b[0] + b[2], o[0] + o[2]) - max(b[0], o[0])
+            iy = min(b[1] + b[3], o[1] + o[3]) - max(b[1], o[1])
+            if ix > 0 and iy > 0 and (ix * iy) / float(min(b[2] * b[3], o[2] * o[3])) > 0.45:
+                dup = True
+                break
+        if not dup:
+            out.append(b)
+    return out      # x, y, w, h
 
 
-def _energy_box(bgr, quantile=0.55):
-    """无脸时的兜底: 用细节能量(梯度)重心与范围估计主体位置。"""
+def _energy_box(bgr, win_w=0.42, win_h=0.52):
+    """无可靠人脸时: 在细节能量图上找"最密窗口"(而非全图包围盒), 得到主体大致位置。"""
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
     gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
     gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-    e = np.hypot(gx, gy)
-    e = cv2.GaussianBlur(e, (0, 0), 9)
-    thr = np.quantile(e, quantile)
-    ys, xs = np.where(e >= thr)
-    if len(xs) < 50:
+    e = cv2.GaussianBlur(np.hypot(gx, gy), (0, 0), 11)
+    h, w = e.shape
+    ww, wh = max(16, int(w * win_w)), max(16, int(h * win_h))
+    ii = cv2.integral(e)
+    # 所有窗口的积分和(向量化)
+    sums = (ii[wh:, ww:] - ii[:-wh, ww:] - ii[wh:, :-ww] + ii[:-wh, :-ww])
+    if sums.size == 0:
         return None, [0.5, 0.5]
-    box = [int(xs.min()), int(ys.min()), int(xs.max() - xs.min()), int(ys.max() - ys.min())]
-    cx, cy = float(xs.mean() / bgr.shape[1]), float(ys.mean() / bgr.shape[0])
-    return box, [round(cx, 3), round(cy, 3)]
+    # 轻微惩罚贴边窗口, 避免总是选中边角
+    ys, xs = np.mgrid[0:sums.shape[0], 0:sums.shape[1]]
+    cx0, cy0 = sums.shape[1] / 2.0, sums.shape[0] / 2.0
+    dist = np.hypot((xs - cx0) / max(cx0, 1), (ys - cy0) / max(cy0, 1))
+    score = sums * (1.0 - 0.12 * dist)
+    iy, ix = np.unravel_index(int(np.argmax(score)), score.shape)
+    box = [int(ix), int(iy), int(ix + ww), int(iy + wh)]      # 角点约定, 与 _subject 一致
+    return box, [round((ix + ww / 2) / w, 3), round((iy + wh / 2) / h, 3)]
 
 
-def _subject(bgr, faces):
+def _skin_box(bgr, min_ratio=0.004):
+    """肤色区域包围盒(人像的可靠线索: 脸+手+脖子), 用于无人脸时的主体定位。"""
     h, w = bgr.shape[:2]
-    if faces:
-        x0 = min(f[0] for f in faces); y0 = min(f[1] for f in faces)
-        x1 = max(f[0] + f[2] for f in faces); y1 = max(f[1] + f[3] for f in faces)
+    hsv = cv2.cvtColor(cv2.GaussianBlur(bgr, (7, 7), 0), cv2.COLOR_BGR2HSV)
+    skin = (cv2.inRange(hsv, np.array([0, 40, 70]), np.array([25, 190, 255])) |
+            cv2.inRange(hsv, np.array([160, 40, 70]), np.array([180, 190, 255])))
+    skin = cv2.morphologyEx(skin, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+    n, labels, stats, _c = cv2.connectedComponentsWithStats(skin, 8)
+    if n <= 1:
+        return None, None
+    # 只认"脸/手"量级的连通块: 暖色背景(石阶/木墙)会整幅命中肤色, 必须靠尺寸与长宽比剔除
+    picked = []
+    for i in range(1, n):
+        a = stats[i, cv2.CC_STAT_AREA] / float(w * h)
+        cw, chh = stats[i, cv2.CC_STAT_WIDTH], stats[i, cv2.CC_STAT_HEIGHT]
+        if 0.0015 <= a <= 0.10 and 0.35 <= cw / float(max(chh, 1)) <= 2.6:
+            picked.append(i)
+    if not picked:
+        return None, None
+    picked = sorted(picked, key=lambda i: -stats[i, cv2.CC_STAT_AREA])[:4]
+    area = sum(stats[i, cv2.CC_STAT_AREA] for i in picked) / float(w * h)
+    if area < min_ratio:
+        return None, None
+    x0 = min(stats[i, cv2.CC_STAT_LEFT] for i in picked)
+    y0 = min(stats[i, cv2.CC_STAT_TOP] for i in picked)
+    x1 = max(stats[i, cv2.CC_STAT_LEFT] + stats[i, cv2.CC_STAT_WIDTH] for i in picked)
+    y1 = max(stats[i, cv2.CC_STAT_TOP] + stats[i, cv2.CC_STAT_HEIGHT] for i in picked)
+    # 肤色块通常只是脸和手 → 向下/向两侧扩张成"人"的范围
+    bw, bh = x1 - x0, y1 - y0
+    box = [max(0, int(x0 - bw * 0.35)), max(0, int(y0 - bh * 0.25)),
+           min(w, int(x1 + bw * 0.35)), min(h, int(y1 + bh * 1.1))]
+    return box, [round((box[0] + box[2]) / 2 / w, 3), round((box[1] + box[3]) / 2 / h, 3)]
+
+
+_POS = {"left": (0.20, None), "center": (0.5, None), "right": (0.80, None),
+        "top": (None, 0.24), "middle": (None, 0.5), "bottom": (None, 0.76)}
+
+
+def _ai_subject_box(ai, bgr):
+    """程序线索全部失效时(暖色高纹理背景等), 采用 AI 判读的主体位置, 但仍由程序校验。"""
+    s = str(((ai or {}).get("subject") or {}).get("position") or "").lower()
+    if not s:
+        return None, None
+    cx = cy = None
+    for k, (px, py) in _POS.items():
+        if k in s:
+            if px is not None:
+                cx = px
+            if py is not None:
+                cy = py
+    if cx is None and cy is None:
+        return None, None
+    cx = 0.5 if cx is None else cx
+    cy = 0.5 if cy is None else cy
+    h, w = bgr.shape[:2]
+    bw, bh = int(w * 0.46), int(h * 0.56)
+    x0 = int(np.clip(cx * w - bw / 2, 0, w - bw))
+    y0 = int(np.clip(cy * h - bh / 2, 0, h - bh))
+    box = [x0, y0, x0 + bw, y0 + bh]
+    # 校验: 该区域必须比全图更有"主体感"(细节能量高于全图均值)
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    e = cv2.GaussianBlur(np.hypot(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3),
+                                  cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)), (0, 0), 11)
+    if e[y0:y0 + bh, x0:x0 + bw].mean() < e.mean() * 0.95:
+        return None, None
+    return box, [round((box[0] + box[2]) / 2 / w, 3), round((box[1] + box[3]) / 2 / h, 3)]
+
+
+def _subject(bgr, faces, ai=None):
+    h, w = bgr.shape[:2]
+    # 人脸可靠度: 占比过小的检测(常见于石墙/栏杆假阳性)不参与构图决策
+    reliable = [f for f in faces if (f[2] * f[3]) / float(w * h) >= 0.012]
+    if reliable:
+        x0 = min(f[0] for f in reliable); y0 = min(f[1] for f in reliable)
+        x1 = max(f[0] + f[2] for f in reliable); y1 = max(f[1] + f[3] for f in reliable)
         fw, fh = x1 - x0, y1 - y0
         # 近景自拍时人脸本身就很大, 扩张必须收敛, 否则主体框会吃掉整张卡
         ex, ey_up, ey_dn = fw * 0.45, fh * 0.60, fh * 1.60
@@ -123,19 +220,29 @@ def _subject(bgr, faces):
                min(w, int(x1 + ex)), min(h, int(y1 + ey_dn))]
         if (box[2] - box[0]) * (box[3] - box[1]) > 0.68 * w * h:   # 面积上限, 超了就退回人脸并集
             box = [max(0, x0), max(0, y0), min(w, x1), min(h, y1)]
-        src = "face"
+        src, center = "face", [round((box[0] + box[2]) / 2 / w, 3), round((box[1] + box[3]) / 2 / h, 3)]
     else:
-        b, c = _energy_box(bgr)
-        box, src = (b, "energy") if b else (None, "none")
+        sk, skc = _skin_box(bgr)                     # 优先肤色(人像), 其次细节能量(通用)
+        if sk:
+            box, src, center = sk, "skin", skc
+        else:
+            ab, ac = _ai_subject_box(ai, bgr)         # 程序线索失效时用 AI 判读(程序仍会校验)
+            if ab:
+                box, src, center = ab, "ai", ac
+            else:
+                b, c = _energy_box(bgr)
+                box, src, center = (b, "energy", c) if b else (None, "none", [0.5, 0.5])
     if not box:
-        return {"box": None, "source": "none", "area_ratio": 0.0, "faces": [], "center": [0.5, 0.5]}
+        return {"box": None, "source": "none", "area_ratio": 0.0, "faces": faces,
+                "faces_reliable": bool(reliable), "center": [0.5, 0.5]}
     x0, y0, x1, y1 = box
     return {
         "box": [x0, y0, x1 - x0, y1 - y0],
         "source": src,
         "area_ratio": round(((x1 - x0) * (y1 - y0)) / float(w * h), 3),
         "faces": faces,
-        "center": [round((x0 + x1) / 2 / w, 3), round((y0 + y1) / 2 / h, 3)],
+        "faces_reliable": bool(reliable),
+        "center": center,
     }
 
 
@@ -260,11 +367,11 @@ def analyze(path, force=False, cache=None):
         im = im.rotate(-deg, expand=True)
     bgr = _bgr(im)
 
+    ai = (_load(folder, "_ai-analysis.json").get(path.name) or {}).get("analysis")
     faces = _faces(bgr)
-    subject = _subject(bgr, faces)
+    subject = _subject(bgr, faces, ai)
     regions = _clean_regions(bgr, subject)
     temp_sat, tone = _temp_sat(bgr), _tone(bgr)
-    ai = (_load(folder, "_ai-analysis.json").get(path.name) or {}).get("analysis")
     if ai and ai.get("rotation_fix") in ("rotate90cw", "rotate90ccw", "rotate180") and not deg:
         detail += f" | AI 提示 {ai['rotation_fix']}(程序未确认, 未采用)"
 
