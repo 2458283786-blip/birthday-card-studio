@@ -158,7 +158,7 @@ def photo_layer(src_path, tpl, box, mask_kind):
                     fade_top=0.0, grain=0.006),
         "night": dict(scale_crop=0.40, bright=1.00, contrast=1.17, sat=1.00, warm=0.05,
                       crush=1.11, lift=0.0, blur=2.0, edge_k=0.6, vig=0.48,
-                      fade_to=NAVY, fade_bottom=0.24, fade_top=0.03, grain=0.006),
+                      fade_to=NAVY, fade_bottom=0.18, fade_top=0.03, grain=0.006),
         # 立体画框: 保留原片色彩(不压不灰), 底部较短融入, 靠投影+顶缘反光营造浮雕
         "diorama": dict(scale_crop=0.40, bright=1.02, contrast=1.12, sat=1.02, warm=0.04,
                         crush=1.05, lift=0.0, blur=2.0, edge_k=0.5, vig=0.34,
@@ -273,6 +273,23 @@ def photo_layer(src_path, tpl, box, mask_kind):
             a = int(48 * (1 - i / 64.0) ** 1.8)
             ad.line([(0, b - i), (W, b - i)], fill=(6, 9, 18, a))
         canvas.alpha_composite(ao.filter(ImageFilter.GaussianBlur(10)))
+        # B 方案: 底栏叠一层极淡的"照片回声"(把照片的颜色延伸下来, 消除死平的空)
+        eh = int((H - b) * 2.0) + 300
+        ew = max(64, int(eh * (pw / max(ph, 1))))
+        ghost = photo.resize((ew, eh), Image.Resampling.LANCZOS).filter(ImageFilter.GaussianBlur(16))
+        ga = np.asarray(ghost.convert("RGBA")).astype(np.float32)
+        layer = np.zeros((H, W, 4), np.float32)
+        x0, y0 = int((W - ew) / 2), b - 40
+        sx0, sy0 = max(0, -x0), max(0, -y0)
+        dx0, dy0 = max(0, x0), max(0, y0)
+        wc, hc = min(ew - sx0, W - dx0), min(eh - sy0, H - dy0)
+        if wc > 0 and hc > 0:
+            layer[dy0:dy0 + hc, dx0:dx0 + wc] = ga[sy0:sy0 + hc, sx0:sx0 + wc]
+        yy = np.arange(H, dtype=np.float32)[:, None]
+        fade_in = np.clip((yy - b) / 70.0, 0, 1)
+        fade_out = np.clip(1.0 - (yy - b) / max(1.0, float(H - b)) * 0.75, 0, 1)
+        layer[..., 3] *= 0.075 * fade_in * fade_out
+        canvas.alpha_composite(Image.fromarray(np.clip(layer, 0, 255).astype(np.uint8), "RGBA"))
     if tpl == "diorama":
         # 顶缘反光(纸张/相纸受光的一条细亮边)
         rim = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -760,20 +777,21 @@ def text_layer(tpl, cfg):
         star4(d, W / 2, 136, 4.2, p["gold"] + (168,))
         # —— 照片上缘登记线(把这行当作"印刷起点") ——
         d.line([(0, 150), (W, 150)], fill=p["gold"] + (72,), width=1)
-        # —— 下方信息区: 大数字与右侧信息同处一个视觉带 ——
-        d.line([(xl, 1206), (xr, 1206)], fill=p["gold"] + (76,), width=1)
+        # —— 下方信息区(A+B 方案): 照片加高到 1290, 信息压进 246px 双栏 ——
+        d.line([(xl, 1318), (xr, 1318)], fill=p["gold"] + (76,), width=1)
         if DATE:
-            tracked(d, (xr - tw(d, DATE, font(SANS, 29), 2.2), 1290), DATE,
-                    font(SANS, 29), p["gold"] + (226,), 2.2)
+            tracked(d, (xr - tw(d, DATE, font(SANS, 25), 2.0), 1356), DATE,
+                    font(SANS, 25), p["gold"] + (226,), 2.0)
         if NO:
-            tracked(d, (xr - tw(d, NO, font(SANS, 22), 1.6), 1330), NO,
-                    font(SANS, 22), (178, 162, 130, 225), 1.6)
+            tracked(d, (xr - tw(d, NO, font(SANS, 20), 1.5), 1394), NO,
+                    font(SANS, 20), (178, 162, 130, 225), 1.5)
+        if WISH:                                    # 祝福语移到右栏, 填补底栏信息密度
+            tracked(d, (xr - tw(d, WISH, fnt(WISH, 18), 4.5), 1442), WISH,
+                    fnt(WISH, 18), (214, 200, 170, 205), 4.5)
         if AGE:
-            f = font(SERIF, 176)
-            d.text((xl + 3, 1384 + 3), AGE, font=f, fill=(8, 11, 20, 155), anchor="ls")   # 压印感阴影
-            d.text((xl, 1384), AGE, font=f, fill=(241, 231, 205, 255), anchor="ls")
-        if WISH:
-            tracked(d, (xl + 4, 1432), WISH, fnt(WISH, 19), (214, 200, 170, 205), 4.5)
+            f = font(SERIF, 208)                    # 大数字放大, 成为底栏主视觉
+            d.text((xl + 3, 1470 + 3), AGE, font=f, fill=(8, 11, 20, 155), anchor="ls")
+            d.text((xl, 1470), AGE, font=f, fill=(241, 231, 205, 255), anchor="ls")
     return im
 
 
@@ -783,7 +801,7 @@ def photo_box(tpl):
         "celebration": ((0, 0, 1024, 966), "round_bottom"),
         "soft": ((0, 0, 1024, 1004), "band"),
         "pop": ((0, 0, 1024, 1092), "diagonal"),
-        "night": ((0, 150, 1024, 1150), "band"),
+        "night": ((0, 150, 1024, 1290), "band"),
         "diorama": ((0, 96, 1024, 1180), "band"),
     }[tpl]
 
