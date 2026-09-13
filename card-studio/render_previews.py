@@ -180,8 +180,18 @@ def apply_mat(col, u, v, view, mtype, amount, band, boost):
         return col
     f = style_film(u, v, view, mtype)
     lum = col[..., 0] * 0.2126 + col[..., 1] * 0.7152 + col[..., 2] * 0.0722
-    col = col * (1.0 - amount * 0.11 * (1.0 - f) * (0.2 + band[..., None] * 0.8))
-    col = col + f * (amount * band * boost * (0.028 + 0.06 * (1.0 - lum)))[..., None]
+    is_gloss = 1.0 if mtype > 2.5 else 0.0
+    is_foil = 1.0 if (mtype > 1.5 and mtype <= 2.5) else 0.0
+    gain = 1.0 + is_gloss * 1.6 + is_foil * 0.5
+    bnd = band ** 1.45 if is_gloss else band
+    col = col * (1.0 - amount * 0.11 * (1.0 - f) * (0.2 + bnd[..., None] * 0.8))
+    col = col + f * (amount * bnd * gain * boost * (0.028 + 0.06 * (1.0 - lum)))[..., None]
+    col = col + f * (amount * is_gloss * 0.045 * (1.0 - lum))[..., None]
+    spec = np.clip(bnd, 0, 1) ** 1.15
+    graze = float(np.clip((np.hypot(view[0], view[1]) - 0.12) * 3.2, 0.0, 1.0))
+    col = col + (is_gloss * (0.09 + 0.52 * graze ** 1.5) * amount)
+    col = col + f * (is_foil * (0.03 + 0.20 * graze ** 1.4) * amount)
+    col = col + spec[..., None] * (is_gloss * amount * 0.22)
     return col
 
 

@@ -31176,12 +31176,24 @@ vec3 styleFilm(vec2 uv, float type) {
   return pearlFilm(uv);
 }
 // 单个区域施加材质(amount=0 即哑光, 原样返回)
+float specB(float b) { return pow(clamp(b,0.,1.), 1.15); }
 vec3 applyMat(vec3 col, vec2 uv, float type, float amount, float band, float boost) {
   if (amount <= 0.001) return col;
   vec3 f = styleFilm(uv, type);
   float lum = dot(col, vec3(.2126,.7152,.0722));
-  col *= 1. - amount*.11*(1.-f)*(.2+band*.8);
-  col += f*amount*band*boost*(.028+.06*(1.-lum));
+  float isGloss = step(2.5, type);
+  float isFoil = step(1.5, type) * (1.0 - isGloss);
+  float gain = 1.0 + isGloss*1.6 + isFoil*0.5;          // 镜面/箔更亮
+  float bnd = mix(band, pow(band, 1.45), isGloss);      // 镜面高光更锐
+  col *= 1. - amount*.11*(1.-f)*(.2+bnd*.8);
+  col += f*amount*bnd*gain*boost*(.028+.06*(1.-lum));
+  col += f*amount*isGloss*.045*(1.-lum);                // 清漆的"湿感"宽高光
+  // 掠射角反射: 越斜越亮(清漆/箔的真实行为), 与底色亮度无关
+  float graze = clamp((length(uView.xy) - 0.12) * 3.2, 0.0, 1.0);
+  float sheen = isGloss * (0.09 + 0.52*pow(graze, 1.5)) * amount;
+  col += vec3(1.0) * sheen;
+  col += (f*0.6 + vec3(0.4)) * (isFoil * (0.03 + 0.20*pow(graze, 1.4)) * amount);
+  col += vec3(1.0) * (isGloss*specB(bnd)*amount*0.22);   // 叠加一条窄闪光
   return col;
 }
 `;
@@ -31221,7 +31233,8 @@ void main() {
   // 边框: 材质 + 边缘高光
   float aFrame = clamp(uMatAmt.x,0.,1.)*gate;
   vec3 fFrame = styleFilm(uv, uMatType.x);
-  col = mix(col, fFrame*.75+.21, wFrame*aFrame*(uFinish > 2.5 ? .34 : .26));
+  float frameK = uMatType.x > 2.5 ? .42 : (uMatType.x > 1.5 ? .34 : .26);
+  col = mix(col, fFrame*.75+.21, wFrame*aFrame*frameK);
   // sparkle / 线稿辉光: 用各区域里的最大强度
   float sparkAmt = max(max(uMatAmt.x,uMatAmt.y), max(uMatAmt.z,uMatAmt.w))*gate;
   vec2 cell = floor(uv*vec2(480.,720.));
