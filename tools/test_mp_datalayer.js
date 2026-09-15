@@ -91,6 +91,12 @@ function run() {
       `useFlat=${card.useFlat} layers=${card.layers.length}`);
     check('有背面 → 可以翻面', card.hasBack === true);
     check('背景按卡面明暗决定', !!card.background, card.background);
+    check('带材质参数(材质层要用)',
+      ['pearl', 'silver', 'gold', 'original'].includes(card.finish)
+      && typeof card.foil === 'number' && typeof card.holoOn === 'boolean',
+      JSON.stringify({ finish: card.finish, foil: card.foil, holoOn: card.holoOn }));
+    check('非 original 材质 → 开启全息覆盖层',
+      card.finish === 'original' ? card.holoOn === false : card.holoOn === true);
 
     console.log('\n[5] 同一个人再输一次(不算第二次导入)');
     return api.claimCard(claimcode.pretty(anyCode));

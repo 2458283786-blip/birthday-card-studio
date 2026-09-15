@@ -64,6 +64,13 @@ def main():
     if code != 0:
         fails.append("require 一致性")
 
+    # 1b) WXML 静态检查
+    title("1b. WXML（事件绑定 / class / 自定义组件声明）")
+    code, out = run([sys.executable, str(TOOLS / "check_mp_wxml.py")])
+    print(out.rstrip())
+    if code != 0:
+        fails.append("WXML 检查")
+
     # 2) JS / WXS 语法
     title("2. JS / WXS 语法")
     js_files = sorted(MP.rglob("*.js"))
@@ -90,7 +97,7 @@ def main():
         print(f"  ✅ {len(js_files)} 个 JS + WXS 全部通过")
 
     # 3) JSON
-    title("3. JSON 合法性")
+    title("3. JSON 合法性 + 编码(不能有 BOM)")
     jbad = []
     for f in list(MP.rglob("*.json")) + [ROOT / "mp-secret.example.json"]:
         try:
@@ -103,6 +110,26 @@ def main():
         fails.append("JSON")
     else:
         print("  ✅ 全部 JSON 正常")
+    # BOM 会让小程序编译器偶尔犯迷糊, 顺手扫一遍
+    bom = [f for f in MP.rglob("*")
+           if f.is_file() and f.suffix in (".wxml", ".wxss", ".js", ".json", ".wxs")
+           and f.read_bytes().startswith(b"\xef\xbb\xbf")]
+    if bom:
+        for f in bom:
+            print(f"  ❌ {f.relative_to(ROOT)} 带 UTF-8 BOM")
+        fails.append("BOM")
+    else:
+        print("  ✅ 没有文件带 BOM")
+
+    # 3b) 卡牌数学(两份实现是否一致 + 手算参考值)
+    title("3b. 卡牌数学（视差 / 材质门控, cardmath.js ↔ holo.wxs）")
+    code, out = run(["node", str(TOOLS / "test_cardmath.js")])
+    tail = [l for l in out.strip().splitlines() if l.strip()]
+    for line in tail[-2:]:
+        print("  " + line)
+    if code != 0:
+        print(out)
+        fails.append("卡牌数学测试")
 
     # 4) 数据层测试
     title("4. 导入流程数据层测试（Node 桩 wx, 跑真实代码）")
@@ -149,6 +176,16 @@ def main():
     if code != 0:
         print(out)
         fails.append("真发布路径测试")
+
+    # 4e) 素材缓存
+    title("4e. 素材缓存（离线可看 / 秒开 / 失败不影响显示）")
+    code, out = run(["node", str(TOOLS / "test_cache.js")])
+    tail = [l for l in out.strip().splitlines() if l.strip()]
+    for line in tail[-2:]:
+        print("  " + line)
+    if code != 0:
+        print(out)
+        fails.append("素材缓存测试")
 
     # 5) 打包产物
     title("5. 打包产物完整性与体积")

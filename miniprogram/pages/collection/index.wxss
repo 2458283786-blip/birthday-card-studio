@@ -42,6 +42,13 @@
   padding: 40rpx 48rpx 80rpx;
 }
 
+/* 离线提示: 一行小字, 不抢眼但必须说清楚 */
+.offline {
+  padding: 24rpx 48rpx 0;
+  font-size: 21rpx;
+  color: var(--ink-faint);
+}
+
 .cell {
   width: 300rpx;
   margin-bottom: 56rpx;

@@ -295,6 +295,17 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(list));
     }
 
+    // ---- AI 状态: 工坊是否配了 key(只报告, 不泄露 key 本身) ----
+    if (req.method === "GET" && p === "/api/ai-status") {
+      const key = (process.env.DEEPSEEK_API_KEY || "").trim();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({
+        available: !!key,
+        model: process.env.DEEPSEEK_MODEL || "deepseek-flash",
+        maxTokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 6000),
+      }));
+    }
+
     // ---- 取色助手: 从照片提取候选底色, 可选让 AI 选(进阶设置面板用) ----
     if (req.method === "POST" && p === "/api/palette") {
       const raw = JSON.parse((await body(req)).toString("utf8"));

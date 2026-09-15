@@ -90,6 +90,9 @@
   background: #0b0f1a;
   box-shadow: 0 24rpx 60rpx rgba(22, 24, 29, 0.22);
   transition: box-shadow 300ms ease;
+  /* 材质层用了 mix-blend-mode; isolate 把混合范围锁在这张卡内部,
+     否则静止时(卡片没有 transform)会和页面白底混合, 整张卡发灰 */
+  isolation: isolate;
 }
 
 .layer {
@@ -101,4 +104,54 @@
   display: block;
   /* 每一层自己带一点过渡, 让视差跟随时是"液态"而不是跳变 */
   transition: transform 140ms ease-out;
+}
+
+/* ---------- 材质层 ----------
+   照抄网页版 CSS-3D 路径(style.css 里的 .foil3d / .finish-*):
+   一层材质渐变 + 一层跟随视角的高光, 叠在所有图层之上。
+   浓度由 JS/WXS 按倾斜角度写进 opacity: 静止时 gate=0.15, 越大倾斜越接近 1。
+   若某些 WebView 不支持 mix-blend-mode, 会退化成普通半透明覆盖 —— 只是弱一点, 不会出问题。 */
+.foil {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  transition: opacity 320ms ease-out;
+}
+
+.foil.finish-pearl {
+  background: linear-gradient(118deg,
+    rgba(255, 255, 255, 0.40),
+    rgba(200, 205, 215, 0.12) 50%,
+    rgba(255, 255, 255, 0.30) 75%);
+  mix-blend-mode: soft-light;
+}
+
+.foil.finish-silver {
+  background: linear-gradient(118deg,
+    rgba(210, 214, 220, 0.50),
+    rgba(180, 186, 192, 0.16) 45%,
+    rgba(245, 248, 252, 0.14) 70%);
+  mix-blend-mode: soft-light;
+}
+
+.foil.finish-gold {
+  background: linear-gradient(118deg,
+    rgba(230, 180, 80, 0.55),
+    rgba(201, 162, 74, 0.18) 45%,
+    rgba(255, 244, 210, 0.12) 70%);
+  mix-blend-mode: overlay;
+}
+
+.sheen {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  transition: opacity 320ms ease-out;
 }

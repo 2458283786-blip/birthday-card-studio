@@ -203,6 +203,10 @@ async function run() {
   check('层深度参数带过来了(视差要用)',
     !!(card.depths && typeof card.depths.subject === 'number'),
     JSON.stringify(card.depths));
+  check('材质参数带过来了(材质层要用)',
+    ['pearl', 'silver', 'gold', 'original'].includes(card.finish)
+    && typeof card.foil === 'number' && card.holoOn === true,
+    JSON.stringify({ finish: card.finish, foil: card.foil, holoOn: card.holoOn }));
 
   console.log('\n[4] 我的收藏(cloud 模式)');
   let cards = await api.listCards();
@@ -226,6 +230,41 @@ async function run() {
     JSON.stringify(res));
   cards = await api.listCards();
   check('列表读取失败 → 空列表而不是崩', Array.isArray(cards) && cards.length === 0);
+  global.wx.cloud.callFunction = backup;
+
+  console.log('\n[7] 断网时页面要能分清"离线有缓存"和"彻底连不上"');
+  currentOpenId = 'openid-A';           // 换回有卡的那个人（第 5 节切走过）
+  // 先正常拉一次, 让缓存里有一份列表
+  await api.listCards();
+  global.wx.cloud.callFunction = ({ fail }) => fail && fail(new Error('offline'));
+  let r = await api.listCardsWithState();
+  check('有缓存 → 仍然显示卡片', r.cards.length === 1, `实际 ${r.cards.length}`);
+  check('并且标记 offline + cached（页面提示"离线查看"）',
+    r.state.offline === true && r.state.cached === true && r.state.reason === 'CACHED',
+    JSON.stringify(r.state));
+
+  // 把缓存清掉, 再断网 → 必须让页面知道"连不上", 而不是显示"还没有卡"
+  delete storage['cards_list_cache_v1'];
+  r = await api.listCardsWithState();
+  check('没缓存 → 空列表', r.cards.length === 0, `实际 ${r.cards.length}`);
+  check('并且标记 offline + 未缓存（页面给"重试"而不是"还没有卡"）',
+    r.state.offline === true && r.state.cached === false && r.state.reason === 'NETWORK',
+    JSON.stringify(r.state));
+
+  // 云函数自己报错(比如集合没建) 也要走兜底并留下原因
+  global.wx.cloud.callFunction = ({ success }) =>
+    success && success({ result: { ok: false, cards: [], message: 'collection not exists' } });
+  r = await api.listCardsWithState();
+  check('云函数报错 → 也走兜底且原因可辨',
+    r.state.offline === true && r.state.reason === 'CLOUD_ERROR', JSON.stringify(r.state));
+
+  // getCard 也要把状态带出来, 卡牌页才能区分"不在这里"和"连不上"
+  global.wx.cloud.callFunction = ({ fail }) => fail && fail(new Error('offline'));
+  const one = await api.getCard(rec.cardId);
+  check('getCard 返回 {card, state}', 'card' in one && 'state' in one,
+    Object.keys(one).join(','));
+  check('连不上时 card 为 null 但 state 说明原因',
+    one.card === null && one.state.offline === true, JSON.stringify(one.state));
   global.wx.cloud.callFunction = backup;
 
   console.log(`\n结果: ${passed} 通过 / ${failed} 失败`);

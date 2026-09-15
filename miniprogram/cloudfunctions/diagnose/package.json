@@ -1,0 +1,9 @@
+{
+  "name": "diagnose",
+  "version": "1.0.0",
+  "description": "环境自检: 数据库/集合/读写/云存储是否都通",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

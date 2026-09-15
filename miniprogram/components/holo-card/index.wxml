@@ -16,6 +16,8 @@
   data-dbg="{{depths.background}}"
   data-dsu="{{depths.subject}}"
   data-dfx="{{depths.effects}}"
+  data-foil="{{foil}}"
+  data-holo="{{holoOn}}"
   bindtouchstart="{{holo.touchStart}}"
   bindtouchmove="{{holo.touchMove}}"
   bindtouchend="{{holo.touchEnd}}"
@@ -29,6 +31,8 @@
             <view class="clip">
 
               <block wx:if="{{face === 'front' && !useFlat}}">
+                <!-- l-txt 故意不参与视差(和 shader 一致: 文字固定贴在卡面), 所以它没有 WXS 选择钩子
+                     check-mp-wxml: allow l-txt -->
                 <image class="layer l-bg" src="{{L.background}}" style="{{LS.background}}" mode="aspectFill" />
                 <image class="layer l-sub" src="{{L.subject}}" style="{{LS.subject}}" mode="aspectFill" />
                 <image class="layer l-fx" src="{{L.effects}}" style="{{LS.effects}}" mode="aspectFill" />
@@ -36,6 +40,13 @@
               </block>
               <image wx:elif="{{face === 'front'}}" class="layer" src="{{flat}}" mode="aspectFill" />
               <image wx:else class="layer" src="{{back}}" mode="aspectFill" binderror="onImgError" />
+
+              <!-- 材质层: 与网页版 CSS-3D 路径同一套做法(WebGL 不可用时网页也是这两层)。
+                   叠在所有图层之上; 静止时很淡, 越倾斜越亮(sheen 位置跟着倾斜走)。 -->
+              <block wx:if="{{face === 'front' && holoOn}}">
+                <view class="foil finish-{{finish}}" style="{{foilStyle}}"></view>
+                <view class="sheen" style="{{sheenStyle}}"></view>
+              </block>
 
             </view>
           </view>

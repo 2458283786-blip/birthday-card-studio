@@ -330,7 +330,7 @@ const $ = (id) => document.getElementById(id);
 const TPL_LABEL = { studio:"经典工坊", celebration:"Celebration", soft:"Soft", pop:"Pop",
                     night:"Night", diorama:"Diorama" };
 let chosen = null, currentStyle = "ink", currentMode = "auto", currentTemplate = "night";
-let pollTimer = null, currentJob = null, viewMode = "static", readyTimer = null;
+let pollTimer = null, currentJob = null, viewMode = "static", readyTimer = null, jobsCache = [];
 function note(msg) {
   const el = $("stageNote");
   if (!msg) { el.style.display = "none"; el.textContent = ""; return; }
@@ -456,6 +456,7 @@ function esc(s) {
 async function poll() {
   let list = [];
   try { list = await (await fetch("/api/jobs")).json(); } catch (e) { return; }
+  jobsCache = list;
   const done = list.filter((j) => j.status === "done");
   $("histCount").textContent = done.length;
   renderHistory(list);
@@ -641,11 +642,26 @@ async function saveEditor() {
 $("editCancel").onclick = () => $("editDialog").close();
 $("editSave").onclick = saveEditor;
 $("aiBtn").onclick = () => {
-  if (!advId) { toast("先在历史记录里点开一张卡, 再用 AI 选底色"); return; }
-  const d = $("advPanel");
-  d.closest("details").open = true;
-  d.scrollIntoView({ behavior: "smooth", block: "center" });
-  loadPalette(true);
+  const openPanel = () => {
+    const d = $("advPanel");
+    d.closest("details").open = true;
+    d.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  // ① 已选中某张卡 → 直接对这张卡跑 AI
+  if (advId) { openPanel(); return loadPalette(true); }
+  // ② 历史里有已完成的卡 → 自动选最近一张(不让用户自己去翻)
+  const done = (jobsCache || []).filter((j) => j.status === "done");
+  if (done.length) {
+    const j = done[done.length - 1];
+    selectJob(j);
+    openPanel();
+    toast("已自动选中最近一张卡:「" + ((j.title && j.title !== "无题") ? j.title : "未命名") + "」");
+    return loadPalette(true);
+  }
+  // ③ 有照片但还没生成 → 说清先后关系
+  if (chosen) { toast("AI 要先看到照片: 点左边「✨ 生成卡片」, 生成后再点这里选底色", true); return; }
+  // ④ 什么都没有
+  toast("先拖入一张照片 → 生成卡片, 然后就能让 AI 选底色", true);
 };
 $("histBtnTop").onclick = () => $("histDrawer").classList.toggle("open");
 
@@ -782,6 +798,15 @@ async function applyAdvanced() {
 if ($("aiColor")) $("aiColor").onclick = () => loadPalette(true);
 if ($("applyBase")) $("applyBase").onclick = () => loadPalette(false);
 if ($("applyAdv")) $("applyAdv").onclick = applyAdvanced;
+
+(async () => {                                   // 顶栏 AI 指示灯: 反映工坊进程是否配了 key
+  try {
+    const s = await (await fetch("/api/ai-status")).json();
+    const btn = $("aiBtn"), dot = $("aiDot");
+    if (s.available) { dot.classList.add("on"); btn.title = "AI 已就绪(" + s.model + ")· 点击让 AI 选底色"; }
+    else { btn.title = "AI 未配置: 启动工坊前设置 DEEPSEEK_API_KEY, 否则点击会退回纯程序取色"; }
+  } catch (e) { /* 忽略 */ }
+})();
 
 syncTemplate();
 poll();

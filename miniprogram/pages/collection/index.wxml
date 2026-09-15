@@ -10,6 +10,11 @@
   </view>
   <view class="hair"></view>
 
+  <!-- 用的是本地的上次列表: 说明一句, 别让人以为卡丢了 -->
+  <view class="offline" wx:if="{{offline && cards.length}}">
+    离线查看 · 连上网络后会自动更新
+  </view>
+
   <view class="grid" wx:if="{{cards.length}}">
     <view
       class="cell"
@@ -27,7 +32,14 @@
     </view>
   </view>
 
-  <!-- 空态: 不留空卡框, 直接告诉他怎么把卡拿进来 -->
+  <!-- 连不上云端、本地也没缓存: 说清楚并给重试, 不要显示"还没有卡" -->
+  <view class="empty" wx:elif="{{failed}}">
+    <view class="empty-title">暂时连不上</view>
+    <view class="empty-sub">网络或云端环境有问题，稍后再试一次</view>
+    <view class="empty-btn" bindtap="onRetry">重试</view>
+  </view>
+
+  <!-- 真的没有卡: 不留空卡框, 直接告诉他怎么把卡拿进来 -->
   <view class="empty" wx:elif="{{!loading}}">
     <view class="empty-title">还没有卡</view>
     <view class="empty-sub">输入我们发给你的导入码，卡就会出现在这里</view>

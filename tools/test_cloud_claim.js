@@ -34,6 +34,15 @@ function matches(doc, cond) {
 const fakeDb = {
   collection() {
     return {
+      // diagnose 用: 集合存在性检查
+      count: async () => {
+        if (fakeDb.__noCollection) {
+          const e = new Error('collection not exists');
+          e.errMsg = 'database collection not exists';
+          throw e;
+        }
+        return { total: docs.length };
+      },
       where(cond) {
         let order = null;
         const api = {
@@ -66,12 +75,25 @@ const fakeDb = {
         };
         return api;
       },
+      // diagnose 用: 写 / 读 / 删
+      add: async ({ data }) => {
+        const doc = clone(data);
+        doc._id = 'doc' + nextId++;
+        docs.push(doc);
+        return { _id: doc._id };
+      },
       doc(id) {
         return {
           get: async () => {
             const found = docs.find((d) => d._id === id);
             if (!found) throw new Error('document not found');
             return { data: clone(found) };
+          },
+          remove: async () => {
+            const i = docs.findIndex((d) => d._id === id);
+            if (i < 0) throw new Error('document not found');
+            docs.splice(i, 1);
+            return { stats: { removed: 1 } };
           }
         };
       }
@@ -83,8 +105,24 @@ const fakeCloud = {
   DYNAMIC_CURRENT_ENV: 'test-env',
   init() {},
   getWXContext: () => ({ OPENID: currentOpenId }),
-  database: () => fakeDb
+  database: () => fakeDb,
+  // diagnose 用
+  uploadFile: async ({ cloudPath }) => {
+    if (fakeCloud.__noStorage) {
+      const e = new Error('storage not enabled');
+      e.errMsg = 'storage not enabled';
+      throw e;
+    }
+    uploaded.push(cloudPath);
+    return { fileID: 'cloud://test-env/' + cloudPath };
+  },
+  deleteFile: async ({ fileList }) => {
+    deleted.push(fileList[0]);
+    return { fileList: fileList.map((f) => ({ fileID: f, status: 0 })) };
+  }
 };
+const uploaded = [];
+const deleted = [];
 
 const origLoad = Module._load;
 Module._load = function (request) {
@@ -209,6 +247,48 @@ async function run() {
   currentOpenId = 'openid-nobody';
   list = await myCards.main();
   check('没领过的人看到空', list.cards.length === 0, `实际 ${list.cards.length}`);
+
+  console.log('\n[7] 环境自检云函数（第一次配云环境时靠它定位问题）');
+  const diagnose = require(path.join(__dirname, '..', 'miniprogram', 'cloudfunctions',
+                                     'diagnose', 'index.js'));
+  currentOpenId = 'openid-A';
+  const before = docs.length;
+  let report = await diagnose.main();
+  check('全部检查项通过', report.ok === true,
+    JSON.stringify(report.checks.filter((c) => !c.ok)));
+  check('检查项覆盖数据库/读写/云存储',
+    report.checks.length >= 6 && report.checks.some((c) => /云存储/.test(c.name)),
+    report.checks.map((c) => c.name).join(' | '));
+  check('自检不留垃圾数据（临时记录已删）',
+    docs.length === before && !docs.some((d) => d.cardId === 'DIAG'),
+    `记录数 ${docs.length} vs ${before}`);
+  check('云存储的临时文件也删了', uploaded.length === 1 && deleted.length === 1,
+    `上传 ${uploaded.length} 删除 ${deleted.length}`);
+  check('提示语告诉下一步做什么', /publish_to_mp/.test(report.hint), report.hint);
+
+  console.log('\n[8] 集合不存在时要指得出来');
+  fakeDb.__noCollection = true;
+  report = await diagnose.main();
+  fakeDb.__noCollection = false;
+  check('整体不通过', report.ok === false);
+  const colCheck = report.checks.find((c) => /集合/.test(c.name));
+  check('明确指出集合有问题', !!colCheck && colCheck.ok === false);
+  check('并且告诉他去新建集合', /新建/.test(colCheck.detail), colCheck.detail);
+  check('提示语给出待修项数量', /1 项没过/.test(report.hint) || /没过/.test(report.hint),
+    report.hint);
+
+  console.log('\n[9] 云存储没开通时也要说清楚');
+  fakeCloud.__noStorage = true;
+  const before2 = docs.length;
+  report = await diagnose.main();
+  fakeCloud.__noStorage = false;
+  const storeCheck = report.checks.find((c) => /云存储能上传/.test(c.name));
+  check('云存储那项是失败的', !!storeCheck && storeCheck.ok === false);
+  check('提示他去开通存储', /存储/.test(storeCheck.detail), storeCheck.detail);
+  check('数据库那部分仍然正常（不会因为一个错全崩）',
+    report.checks.filter((c) => /集合|写记录|读回来/.test(c.name)).every((c) => c.ok),
+    JSON.stringify(report.checks.map((c) => [c.name, c.ok])));
+  check('即使云存储失败, 临时记录也没留下', docs.length === before2);
 
   console.log(`\n结果: ${passed} 通过 / ${failed} 失败`);
   process.exit(failed ? 1 : 0);

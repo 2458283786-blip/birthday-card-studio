@@ -70,5 +70,8 @@
     "background": -0.3,
     "subject": 0.34,
     "effects": 0.62
-  }
+  },
+  "finish": "pearl",
+  "foil": 0.52,
+  "holoEnabled": true
 }

@@ -287,6 +287,12 @@ def main():
                   all(k in doc.get("card", {}) for k in
                       ("cardId", "displayId", "date", "surface", "depth")),
                   json.dumps(list(doc.get("card", {}).keys()), ensure_ascii=False))
+            check("card 带材质参数（材质层要用）",
+                  doc["card"].get("finish") in ("pearl", "silver", "gold", "original")
+                  and isinstance(doc["card"].get("foil"), (int, float))
+                  and isinstance(doc["card"].get("holoEnabled"), bool),
+                  json.dumps({k: doc["card"].get(k) for k in
+                              ("finish", "foil", "holoEnabled")}, ensure_ascii=False))
 
             # --- 落盘的 record.json 与云端一致 ---
             rec_file = pub / "record.json"

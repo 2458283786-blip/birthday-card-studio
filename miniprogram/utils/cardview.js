@@ -57,6 +57,9 @@ function buildView(meta, assets) {
   if (meta.fields.ownerName) owners.push({ label: 'FOR', value: meta.fields.ownerName });
   if (meta.fields.creatorName) owners.push({ label: 'CREATED BY', value: meta.fields.creatorName });
 
+  const finish = meta.finish || 'pearl';
+  const foil = (typeof meta.foil === 'number') ? meta.foil : 0.55;
+
   return {
     cardId: meta.cardId,
     displayId: meta.displayId || meta.cardId,
@@ -71,6 +74,10 @@ function buildView(meta, assets) {
     layers,
     depths: meta.depths || DEFAULT_DEPTH,
     useFlat,
+    // 材质：与网页版 CSS-3D 路径同一套（finish 决定渐变与混合模式, foil 决定浓度）
+    finish,
+    foil,
+    holoOn: finish !== 'original' && meta.holoEnabled !== false,
     notes,
     owners
   };
@@ -85,6 +92,9 @@ function toView(item) {
     date: item.date,
     surface: item.surface,
     depths: item.depth,
+    finish: item.finish,
+    foil: item.foil,
+    holoEnabled: item.holoEnabled,
     fields: item.fields || fieldsOf(item)
   }, {
     front: item.front,
@@ -105,6 +115,9 @@ function viewFromRecord(record) {
     date: card.date,
     surface: card.surface || 'dark',
     depths: card.depth,
+    finish: card.finish,
+    foil: card.foil,
+    holoEnabled: card.holoEnabled,
     fields: card.fields || fieldsOf(card)
   }, {
     front: assets.front,

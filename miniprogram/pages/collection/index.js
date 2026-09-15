@@ -6,7 +6,10 @@ Page({
     cards: [],
     countText: '',
     loading: true,
-    demo: []
+    demo: [],
+    // 三种情况要分清楚, 否则断网时会显示"还没有卡", 让人以为卡丢了
+    offline: false,     // 用的是本地的上次列表
+    failed: false       // 云端没连上, 本地也没缓存 → 给重试
   },
 
   onLoad() {
@@ -23,13 +26,20 @@ Page({
   },
 
   load() {
-    api.listCards().then((cards) => {
+    api.listCardsWithState().then((r) => {
       this.setData({
-        cards,
+        cards: r.cards,
+        countText: r.cards.length ? `${r.cards.length} CARDS` : '',
         loading: false,
-        countText: cards.length ? `${cards.length} CARDS` : ''
+        offline: !!r.state.offline,
+        failed: !!(r.state.offline && !r.state.cached)
       });
     });
+  },
+
+  onRetry() {
+    this.setData({ loading: true, failed: false });
+    this.load();
   },
 
   onImport() {

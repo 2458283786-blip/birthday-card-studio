@@ -1,5 +1,7 @@
+const math = require('./cardmath.js');
+
 const FLIP_MS = 260;   // 翻面单程时长(卡片转到侧对屏幕的一半)
-const DEPTH_DEFAULT = { background: -0.30, subject: 0.34, effects: 0.64 };
+const DEPTH_DEFAULT = math.DEPTH_DEFAULT;
 
 function clamp(v, a, b) {
   if (v < a) return a;
@@ -7,39 +9,13 @@ function clamp(v, a, b) {
   return v;
 }
 
-/**
- * 层间视差 —— 与网页版 shader 同一套公式（holo.wxs 里也有一份，改要一起改）：
- *   uView = (-cos(rx)*sin(ry), sin(rx), cos(rx)*cos(ry))
- *   uvShift = uView.xy / max(|uView.z|,.4) * depth * 0.20
- *   内容位移(px) = -uvShift * 卡牌尺寸
- * 文字层不参与视差（shader 里它固定贴在卡面）。
- */
-function parallaxStyles(rxDeg, ryDeg, W, H, depths) {
-  const d = depths || DEPTH_DEFAULT;
-  const rx = rxDeg * Math.PI / 180;
-  const ry = ryDeg * Math.PI / 180;
-  const cx = Math.cos(rx);
-  const vx = -cx * Math.sin(ry);
-  const vy = Math.sin(rx);
-  const vz = cx * Math.cos(ry);
-  const az = Math.max(Math.abs(vz), 0.4);
-  const kx = -(vx / az) * 0.20 * W;
-  const ky = -(vy / az) * 0.20 * H;
+/* 视差与材质的公式都在 cardmath.js 里(纯函数), 这里只做一层薄封装 */
+const parallaxStyles = math.layerStyles;
 
-  const out = {};
-  ['background', 'subject', 'effects'].forEach((name) => {
-    const depth = d[name] || 0;
-    const dx = kx * depth;
-    const dy = ky * depth;
-    let sc = 1;
-    if (name === 'background') {
-      // 背景放大一点, 否则位移后卡边会露空隙
-      sc = Math.min(1.2, 1 + 2 * (Math.abs(dx) / W) + 2 * (Math.abs(dy) / H));
-    }
-    out[name] = `transform: translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc.toFixed(3)});`;
-  });
-  out.text = 'transform: translate(0px, 0px);';
-  return out;
+/** 关掉全息(original 材质)时不渲染材质层 */
+function foilStyles(rxDeg, ryDeg, foil, holoOn) {
+  if (!holoOn) return { foilStyle: '', sheenStyle: '' };
+  return math.foilStyles(rxDeg, ryDeg, foil);
 }
 
 Component({
@@ -57,11 +33,17 @@ Component({
         const W = (app && app.globalData.cardWidthPx) || 292;
         const H = Math.round(W * 1.5);
         const depths = value.depths || DEPTH_DEFAULT;
-        this.setData({
+        const finish = value.finish || 'pearl';
+        const foil = (typeof value.foil === 'number') ? value.foil : 0.55;
+        const holoOn = !!value.holoOn;
+        this.setData(Object.assign({
           L,
           W,
           H,
           depths,
+          finish,
+          foil,
+          holoOn,
           flat: value.flat || '',
           back: value.back || '',
           hasBack: !!value.hasBack,
@@ -70,7 +52,7 @@ Component({
           flipStyle: 'transform: rotateY(0deg); transition: none;',
           motionStyle: '',
           LS: parallaxStyles(0, 0, W, H, depths)
-        });
+        }, foilStyles(0, 0, foil, holoOn)));
       }
     }
   },
@@ -88,7 +70,13 @@ Component({
     face: 'front',
     floatOn: true,
     motionStyle: '',
-    flipStyle: 'transform: rotateY(0deg); transition: none;'
+    flipStyle: 'transform: rotateY(0deg); transition: none;',
+    // 材质
+    finish: 'pearl',
+    foil: 0.55,
+    holoOn: true,
+    foilStyle: '',
+    sheenStyle: ''
   },
 
   lifetimes: {
@@ -213,6 +201,7 @@ Component({
       };
       if (!this.dragging) {
         patch.LS = parallaxStyles(m.cur.x, m.cur.y, this.data.W, this.data.H, this.data.depths);
+        Object.assign(patch, foilStyles(m.cur.x, m.cur.y, this.data.foil, this.data.holoOn));
       }
       this.setData(patch);
     }

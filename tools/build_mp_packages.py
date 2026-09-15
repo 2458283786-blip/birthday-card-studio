@@ -39,6 +39,7 @@ BACK_SIZE = (720, 1080)
 
 # 层深度的兜底值(与 shader 的 parallax 同一套参数); 实际取值来自 card.json 的 _studio.parameters
 DEFAULT_DEPTH = {"background": -0.30, "subject": 0.34, "effects": 0.64}
+DEFAULT_FOIL = 0.55          # 材质覆盖层浓度(网页版默认 0.52~0.55)
 
 
 def edge_tone(img):
@@ -65,7 +66,7 @@ def save_webp(img, dst, size):
     return dst.stat().st_size
 
 
-def trim_card_json(card, params):
+def trim_card_json(card, params, appearance=None):
     """只保留小程序要用的字段; 生成侧参数(_studio 等)不进小程序包。"""
     keep = ("schemaVersion", "cardId", "displayId", "internalId", "theme",
             "template", "title", "date", "creator", "owner", "content",
@@ -78,6 +79,13 @@ def trim_card_json(card, params):
     out["depth"] = {
         k: params.get(f"{k}Depth", v) for k, v in DEFAULT_DEPTH.items()
     }
+    # 材质: 网页版 CSS-3D 路径用 finish 选渐变与混合模式, foil 决定覆盖层浓度
+    ap = appearance or {}
+    finish = str(ap.get("finish") or "pearl")
+    out["finish"] = finish
+    out["foil"] = params.get("foil", DEFAULT_FOIL)
+    out["holoEnabled"] = (bool((card.get("material") or {}).get("holoEnabled", True))
+                          and finish != "original")
     return out
 
 
@@ -92,7 +100,8 @@ def build_assets(src, dst, card, params):
     front_src = src / "preview" / "front.jpg"
     if not front_src.exists():
         raise FileNotFoundError(f"缺少 {front_src}")
-    data = trim_card_json(card, params)
+    appearance = ((card.get("_studio") or {}).get("appearance") or {})
+    data = trim_card_json(card, params, appearance)
 
     # 1) 正面整图
     front = Image.open(front_src).convert("RGB")
@@ -167,6 +176,9 @@ def write_manifest(cards):
             "date": c.get("date"),
             "surface": c["surface"],
             "depth": c.get("depth") or DEFAULT_DEPTH,
+            "finish": c.get("finish") or "pearl",
+            "foil": c.get("foil", DEFAULT_FOIL),
+            "holoEnabled": bool(c.get("holoEnabled", True)),
             "hasBack": c["hasBack"],
             "layerNames": c["layerNames"],
             "front": f"/data/packages/{c['cardId']}/front.webp",

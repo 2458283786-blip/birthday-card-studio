@@ -18,6 +18,7 @@ Page({
     card: null,
     missing: false,
     failed: false,
+    offline: false,
     ready: false,
     enterStyle: '',
     hintOff: false,
@@ -55,13 +56,35 @@ Page({
       wx.reLaunch({ url: '/pages/collection/index' });
       return;
     }
+    this.cardId = cardId;
+    this.load();
+  },
 
-    getCard(cardId).then((card) => {
-      if (!card) {
-        this.setData({ missing: true });
+  /**
+   * 三种情况分开处理:
+   *   云端连不上(且没缓存) → 给"重试", 不装作卡不存在
+   *   真的找不到这张卡      → "这张卡不在这里"
+   *   正常                 → 显示
+   */
+  load() {
+    getCard(this.cardId).then((r) => {
+      const state = (r && r.state) || {};
+      if (!r || !r.card) {
+        this.setData({
+          card: null,
+          failed: false,
+          offline: !!state.offline,
+          missing: !state.offline
+        });
         return;
       }
-      this.setData({ card, bg: card.background });
+      this.setData({
+        card: r.card,
+        bg: r.card.background,
+        offline: !!state.offline,
+        missing: false,
+        failed: false
+      });
       this.enterTimer = setTimeout(() => {
         this.setData({ ready: true, enterStyle: '' });
       }, 60);
@@ -70,8 +93,13 @@ Page({
     }).catch((err) => {
       // 数据层出错时不要再装作"卡不存在", 直接显示错误并打日志 —— 否则会被误判成内容为空
       console.error('[card] 读取卡片失败', err);
-      this.setData({ card: null, missing: false, failed: true });
+      this.setData({ card: null, missing: false, offline: false, failed: true });
     });
+  },
+
+  onRetry() {
+    this.setData({ failed: false, offline: false, missing: false });
+    this.load();
   },
 
   onUnload() {

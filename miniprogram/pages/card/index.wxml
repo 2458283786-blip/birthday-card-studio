@@ -29,11 +29,21 @@
     <view class="hint {{hintOff ? 'off' : ''}}">拖动旋转 · 点击翻面</view>
   </block>
 
-  <!-- 找不到这张卡 / 数据层出错: 说清楚是哪一种, 不装成"内容为空" -->
+  <!-- 找不到 / 连不上 / 数据层出错: 三种说三种话, 不装成"内容为空" -->
   <view class="missing" wx:else>
-    <view class="missing-t">{{failed ? '卡牌数据读取出错' : '这张卡不在这里'}}</view>
-    <view class="missing-s" wx:if="{{failed}}">看一下控制台的报错信息</view>
-    <view class="missing-s" wx:elif="{{missing}}">它可能还没做好，或者链接不对</view>
+    <block wx:if="{{failed}}">
+      <view class="missing-t">卡牌数据读取出错</view>
+      <view class="missing-s">看一下控制台的报错信息</view>
+    </block>
+    <block wx:elif="{{offline}}">
+      <view class="missing-t">暂时连不上</view>
+      <view class="missing-s">网络或云端环境有问题，稍后再试一次</view>
+    </block>
+    <block wx:else>
+      <view class="missing-t">这张卡不在这里</view>
+      <view class="missing-s" wx:if="{{missing}}">它可能还没做好，或者链接不对</view>
+    </block>
+    <view class="missing-btn" wx:if="{{failed || offline}}" bindtap="onRetry">重试</view>
   </view>
 
   <!-- 保存用画布(不在屏幕上显示) -->

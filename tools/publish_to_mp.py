@@ -291,7 +291,8 @@ def publish(card_id, count, dry):
             # card 字段直接复用打包器的 trim_card_json —— 保证"本地样板"和
             # "真上传的数据"不可能漂移(之前手写就漂了: depth 形状不一样)。
             params = ((card.get("_studio") or {}).get("parameters") or {})
-            data = bmp.trim_card_json(card, params)
+            appearance = ((card.get("_studio") or {}).get("appearance") or {})
+            data = bmp.trim_card_json(card, params, appearance)
             data["hasBack"] = (src / "preview" / "back.jpg").exists()
             layer_names = [n for n in bmp.LAYERS
                            if (src / "layers" / f"{n}.png").exists()]

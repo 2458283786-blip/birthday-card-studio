@@ -73,6 +73,19 @@
   color: var(--ink-faint);
 }
 
+.missing-btn {
+  margin: 48rpx auto 0;
+  width: 260rpx;
+  height: 80rpx;
+  border-radius: 40rpx;
+  border: 1rpx solid var(--hair);
+  color: var(--ink);
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .export-canvas {
   position: fixed;
   left: -2000px;

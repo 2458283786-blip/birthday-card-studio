@@ -21,7 +21,10 @@ var S = {
   moved: 0,
   w: 292, h: 438,
   depths: { background: -0.30, subject: 0.34, effects: 0.64 },
-  els: null
+  foil: 0.55,
+  holo: true,
+  els: null,
+  foilEls: null
 };
 
 function clamp(v, a, b) {
@@ -44,35 +47,77 @@ function apply(ins) {
   });
 }
 
-function applyLayers() {
-  var els = S.els;
-  if (!els) return;
-  var rx = S.rx * Math.PI / 180;
-  var ry = S.ry * Math.PI / 180;
-  var cx = Math.cos(rx), cy = Math.cos(ry);
+/**
+ * 纯数学: 各层位移与缩放。
+ * 与 cardmath.js 的 layerOffsets() 必须逐点一致 —— tools/test_cardmath.js 会比对。
+ */
+function layerOffsets(rxDeg, ryDeg, w, h, depths) {
+  var rx = rxDeg * Math.PI / 180;
+  var ry = ryDeg * Math.PI / 180;
+  var cx = Math.cos(rx);
   var vx = -cx * Math.sin(ry);
   var vy = Math.sin(rx);
-  var vz = cx * cy;
+  var vz = cx * Math.cos(ry);
   var az = Math.abs(vz);
   if (az < 0.4) az = 0.4;
-  var kx = -(vx / az) * 0.20 * S.w;
-  var ky = -(vy / az) * 0.20 * S.h;
+  var kx = -(vx / az) * 0.20 * w;
+  var ky = -(vy / az) * 0.20 * h;
   var names = ['background', 'subject', 'effects'];
-  var keys = ['bg', 'su', 'fx'];
+  var out = {};
   for (var i = 0; i < names.length; i++) {
-    var el = els[keys[i]];
-    if (!el) continue;
-    var d = S.depths[names[i]] || 0;
+    var d = depths[names[i]] || 0;
     var dx = kx * d;
     var dy = ky * d;
     var sc = 1;
     if (names[i] === 'background') {
       // 背景要放大一点, 否则位移之后卡边会露出空隙
-      sc = 1 + 2 * (Math.abs(dx) / S.w) + 2 * (Math.abs(dy) / S.h);
+      sc = 1 + 2 * (Math.abs(dx) / w) + 2 * (Math.abs(dy) / h);
       if (sc > 1.2) sc = 1.2;
     }
-    el.setStyle({ transform: 'translate(' + dx.toFixed(1) + 'px, ' + dy.toFixed(1) +
-      'px) scale(' + sc.toFixed(3) + ')' });
+    out[names[i]] = { dx: dx, dy: dy, scale: sc };
+  }
+  return out;
+}
+
+/**
+ * 纯数学: 材质层的不透明度与高光位置。
+ * 与 cardmath.js 的 foilOpacity() 必须逐点一致。
+ */
+function foilCalc(rxDeg, ryDeg, foil) {
+  var rx = rxDeg * Math.PI / 180;
+  var ry = ryDeg * Math.PI / 180;
+  var cx = Math.cos(rx);
+  var vx = -cx * Math.sin(ry);
+  var vy = Math.sin(rx);
+  var len = Math.sqrt(vx * vx + vy * vy);
+  var tilt = (len - 0.12) * 3.2;
+  if (tilt < 0) tilt = 0;
+  if (tilt > 1) tilt = 1;
+  var gate = 0.15 + 0.85 * tilt;
+  var op = foil * gate;
+  if (op < 0) op = 0;
+  if (op > 1) op = 1;
+  var mx = 50 - ryDeg * 1.6;
+  var my = 45 + rxDeg * 1.6;
+  if (mx < 5) mx = 5;
+  if (mx > 95) mx = 95;
+  if (my < 5) my = 5;
+  if (my > 95) my = 95;
+  return { tilt: tilt, gate: gate, opacity: op, mx: mx, my: my };
+}
+
+function applyLayers() {
+  var els = S.els;
+  if (!els) return;
+  var o = layerOffsets(S.rx, S.ry, S.w, S.h, S.depths);
+  var keys = ['bg', 'su', 'fx'];
+  var names = ['background', 'subject', 'effects'];
+  for (var i = 0; i < names.length; i++) {
+    var el = els[keys[i]];
+    if (!el) continue;
+    var l = o[names[i]];
+    el.setStyle({ transform: 'translate(' + l.dx.toFixed(1) + 'px, ' + l.dy.toFixed(1) +
+      'px) scale(' + l.scale.toFixed(3) + ')' });
   }
   // 文字层固定不动: 不设置就是"贴"在卡面上
 }
@@ -94,6 +139,28 @@ function cacheEls(ins) {
     su: ins.selectComponent('.l-sub'),
     fx: ins.selectComponent('.l-fx')
   };
+  S.foilEls = {
+    foil: ins.selectComponent('.foil'),
+    sheen: ins.selectComponent('.sheen')
+  };
+}
+
+/**
+ * 材质层: 与 index.js 的 foilStyles() 同一套公式(抄网页版 CSS-3D 路径)
+ *   tilt = clamp((length(uView.xy) - 0.12) * 3.2, 0, 1); gate = 0.15 + 0.85*tilt
+ *   opacity = foil * gate; 高光位置跟着倾斜走
+ */
+function applyFoil() {
+  var els = S.foilEls;
+  if (!els || !els.foil || !S.holo) return;
+  var f = foilCalc(S.rx, S.ry, S.foil);
+  var op = f.opacity.toFixed(3);
+  els.foil.setStyle({ opacity: op });
+  els.sheen.setStyle({
+    opacity: op,
+    'background-image': 'radial-gradient(55% 40% at ' + f.mx.toFixed(1) + '% ' +
+      f.my.toFixed(1) + '%, rgba(255,238,190,0.65), transparent 70%)'
+  });
 }
 
 function readDataset(e) {
@@ -103,6 +170,8 @@ function readDataset(e) {
   S.depths.background = num(ds.dbg, S.depths.background);
   S.depths.subject = num(ds.dsu, S.depths.subject);
   S.depths.effects = num(ds.dfx, S.depths.effects);
+  S.foil = num(ds.foil, S.foil);
+  S.holo = ds.holo === true || ds.holo === 'true';
 }
 
 function touchStart(e, ins) {
@@ -138,6 +207,7 @@ function touchMove(e, ins) {
   S.rz = clamp(-dx * 0.02, -3, 3);      // 一点点扭转, 让动作活起来
   apply(ins);
   applyLayers();
+  applyFoil();
 }
 
 function touchEnd(e, ins) {
@@ -156,11 +226,14 @@ function touchEnd(e, ins) {
   S.rz = 0;
   apply(ins);
   resetLayers();                        // 层的位移也一起缓慢归位
+  applyFoil();                          // 材质层回到"静止"的浓度
   ins.callMethod('setDragging', false);
 }
 
 module.exports = {
   touchStart: touchStart,
   touchMove: touchMove,
-  touchEnd: touchEnd
+  touchEnd: touchEnd,
+  // 只给 tools/test_cardmath.js 比对用(小程序运行时不会调这两个)
+  __math: { layerOffsets: layerOffsets, foilCalc: foilCalc }
 };
