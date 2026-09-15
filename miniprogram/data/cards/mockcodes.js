@@ -10,4 +10,5 @@ module.exports = {
   "HJE8HZTZ": "CARD-QR01",
   "XECZBQC8": "CARD-0001",
   "BSB249F5": "CARD-0001",
+  "5MXXJ3XP": "CARD-0002",
 };

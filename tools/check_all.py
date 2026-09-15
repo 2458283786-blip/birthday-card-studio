@@ -11,6 +11,11 @@
   5. 打包产物完整性      —— 每张卡的素材齐不齐、体积有没有超主包上限
 
 用法: python tools/check_all.py
+
+⚠️ 在 Windows 的 PowerShell 里跑, 请把输出重定向到文件再看:
+      python tools/check_all.py > out.txt 2>&1; Get-Content out.txt
+   直接接管道( | Select-String ... )会打断子进程(node)的输出,
+   表现为"某个测试失败"的假故障 —— 不是代码坏了。
 """
 import json
 import subprocess
@@ -187,8 +192,27 @@ def main():
         print(out)
         fails.append("素材缓存测试")
 
+    # 4f) 自由文本转义(寄语里的引号/换行/emoji 会不会把写库语句拼坏)
+    title("4f. 内容转义（丑字段写进云数据库不能变形）")
+    code, out = run([sys.executable, str(TOOLS / "test_publish_escaping.py")])
+    tail = [l for l in out.strip().splitlines() if l.strip()]
+    for line in tail[-2:]:
+        print("  " + line)
+    if code != 0:
+        print(out)
+        fails.append("内容转义测试")
+
     # 5) 打包产物
-    title("5. 打包产物完整性与体积")
+    title("5. 打包器（含「工作台改了我不认识」的探测）")
+    code, out = run([sys.executable, str(TOOLS / "test_build_packages.py")])
+    tail = [l for l in out.strip().splitlines() if l.strip()]
+    for line in tail[-2:]:
+        print("  " + line)
+    if code != 0:
+        print(out)
+        fails.append("打包器测试")
+
+    title("5b. 打包产物完整性与体积")
     pkgs = MP / "data" / "packages"
     manifest_file = MP / "data" / "cards" / "manifest.js"
     if not manifest_file.exists():

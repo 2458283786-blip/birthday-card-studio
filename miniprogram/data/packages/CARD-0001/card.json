@@ -57,6 +57,7 @@
     "text"
   ],
   "surface": "dark",
+  "bgColor": "#080c16",
   "depth": {
     "background": -0.3,
     "subject": 0.34,
@@ -64,5 +65,28 @@
   },
   "finish": "pearl",
   "foil": 0.55,
-  "holoEnabled": true
+  "holoEnabled": true,
+  "surfaceLum": 0.047,
+  "materials": {
+    "frame": {
+      "type": "pearl",
+      "index": 1,
+      "amount": 0.55
+    },
+    "text": {
+      "type": "matte",
+      "index": 0,
+      "amount": 0.0
+    },
+    "subject": {
+      "type": "pearl",
+      "index": 1,
+      "amount": 0.55
+    },
+    "background": {
+      "type": "pearl",
+      "index": 1,
+      "amount": 0.55
+    }
+  }
 }

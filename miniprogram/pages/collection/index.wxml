@@ -24,7 +24,7 @@
       data-id="{{item.cardId}}"
       bindtap="onOpen"
     >
-      <view class="thumb">
+      <view class="thumb" style="background:{{item.bgColor || '#eceef1'}}">
         <image class="thumb-img" src="{{item.flat}}" mode="aspectFill" lazy-load />
       </view>
       <view class="latin id">{{item.displayId}}</view>

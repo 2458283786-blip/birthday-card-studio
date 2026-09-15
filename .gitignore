@@ -32,3 +32,6 @@ dl2/out/
 dl2/analysis/
 dl2/**/_ai-analysis.json
 dl2/**/_photodna.json
+
+# 自检脚本输出
+check_out.txt

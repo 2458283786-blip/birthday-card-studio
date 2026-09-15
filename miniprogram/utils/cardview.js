@@ -66,6 +66,8 @@ function buildView(meta, assets) {
     title: meta.title || null,
     dateText: prettyDate(meta.date),
     surface: meta.surface || 'dark',
+    // 工作台指定的卡牌底色（可以用 AI 选色）: 用作缩略图加载时的底色, 避免先闪一下灰
+    bgColor: meta.bgColor || '',
     // 卡牌页背景：浅色卡用浅灰底，深色卡用白底（打包时按卡面取色算好 surface）
     background: (meta.surface === 'light') ? '#f2f3f5' : '#ffffff',
     hasBack: !!assets.back,
@@ -91,6 +93,7 @@ function toView(item) {
     title: item.title,
     date: item.date,
     surface: item.surface,
+    bgColor: item.bgColor,
     depths: item.depth,
     finish: item.finish,
     foil: item.foil,
@@ -114,6 +117,7 @@ function viewFromRecord(record) {
     title: card.title,
     date: card.date,
     surface: card.surface || 'dark',
+    bgColor: card.bgColor,
     depths: card.depth,
     finish: card.finish,
     foil: card.foil,

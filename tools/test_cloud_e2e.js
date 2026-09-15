@@ -207,6 +207,9 @@ async function run() {
     ['pearl', 'silver', 'gold', 'original'].includes(card.finish)
     && typeof card.foil === 'number' && card.holoOn === true,
     JSON.stringify({ finish: card.finish, foil: card.foil, holoOn: card.holoOn }));
+  check('卡牌底色带过来了(缩略图加载时用它当底色)',
+    typeof card.bgColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(card.bgColor),
+    String(card.bgColor));
 
   console.log('\n[4] 我的收藏(cloud 模式)');
   let cards = await api.listCards();

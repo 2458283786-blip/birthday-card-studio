@@ -204,6 +204,17 @@ def check_file(wxml):
         if "-" in tag and tag not in BUILTIN_TAGS:
             problems.append(f"{rel}: 用了 <{tag}>, 但 {cfg.name} 的 usingComponents 里没声明")
 
+    # 5) 卡牌专有: 材质层必须夹在"光点"和"文字"之间
+    #    shader 里文字层的材质量默认是 0(字体不上材质), 盖在文字上就错了。
+    i_fx = wxml_text.find('class="layer l-fx"')
+    i_txt = wxml_text.find('class="layer l-txt"')
+    if i_fx >= 0 and i_txt >= 0:
+        i_foil = wxml_text.find('class="foil', i_fx)
+        if not (i_fx < i_foil < i_txt):
+            problems.append(
+                f"{rel}: 材质层(.foil)没有夹在光点(.l-fx)与文字(.l-txt)之间 —— "
+                f"shader 里文字是不上材质的, 盖到文字上就错了")
+
 
 def main():
     global HOOKS

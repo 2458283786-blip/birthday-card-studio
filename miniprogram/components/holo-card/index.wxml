@@ -36,14 +36,25 @@
                 <image class="layer l-bg" src="{{L.background}}" style="{{LS.background}}" mode="aspectFill" />
                 <image class="layer l-sub" src="{{L.subject}}" style="{{LS.subject}}" mode="aspectFill" />
                 <image class="layer l-fx" src="{{L.effects}}" style="{{LS.effects}}" mode="aspectFill" />
+
+                <!-- 材质层: 与网页版 CSS-3D 路径同一套做法(WebGL 不可用时网页也是这两层)。
+                     位置很关键 —— 必须夹在"光点"和"文字"之间:
+                     shader 里文字层的材质量默认是 0(app.js 的 matAmtOf: text → 0,
+                     applyMat 直接提前返回), 也就是**字体是干净的、不上材质**。
+                     把它放在文字下面, 就等于把材质只加在边框/主体/背景上。 -->
+                <block wx:if="{{holoOn}}">
+                  <view class="foil finish-{{finish}}" style="{{foilStyle}}"></view>
+                  <view class="sheen" style="{{sheenStyle}}"></view>
+                </block>
+
                 <image class="layer l-txt" src="{{L.text}}" style="{{LS.text}}" mode="aspectFill" />
               </block>
               <image wx:elif="{{face === 'front'}}" class="layer" src="{{flat}}" mode="aspectFill" />
               <image wx:else class="layer" src="{{back}}" mode="aspectFill" binderror="onImgError" />
 
-              <!-- 材质层: 与网页版 CSS-3D 路径同一套做法(WebGL 不可用时网页也是这两层)。
-                   叠在所有图层之上; 静止时很淡, 越倾斜越亮(sheen 位置跟着倾斜走)。 -->
-              <block wx:if="{{face === 'front' && holoOn}}">
+              <!-- 只有整图(没有分层)时: 文字已经烧在图里, 没法分开, 只能盖在上面 ——
+                   网页版的降级路径也是这么做的。 -->
+              <block wx:if="{{face === 'front' && holoOn && useFlat}}">
                 <view class="foil finish-{{finish}}" style="{{foilStyle}}"></view>
                 <view class="sheen" style="{{sheenStyle}}"></view>
               </block>
