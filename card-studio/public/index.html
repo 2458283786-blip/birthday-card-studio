@@ -73,6 +73,8 @@
   .stage img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:none}
   .stage .empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;
         align-items:center;justify-content:center;color:#c9c4bd;text-align:center;padding:20px}
+  .stagenote{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#cfcac2;font-size:12px;
+        pointer-events:none;display:none}
   .prevFoot{display:flex;align-items:center;gap:12px;background:var(--surf);border:1px solid var(--line);
         border-radius:12px;padding:12px 14px;flex-wrap:wrap}
   .prevFoot .meta b{font-size:14px}
@@ -216,8 +218,8 @@
     <div class="prevHead">
       <span class="sec">成图预览</span>
       <div class="modes" id="viewModes">
-        <button data-m="static">正面静帧</button>
-        <button data-m="3d" class="on">3D 拖动</button>
+        <button data-m="static" class="on">正面静帧</button>
+        <button data-m="3d">3D 拖动</button>
         <button data-m="back">背面</button>
       </div>
       <div class="modes" id="view3dCtl">
@@ -237,6 +239,7 @@
       <iframe id="viewer" title="卡片预览"></iframe>
       <img id="staticView" alt="正面静帧" />
       <img id="backView" alt="背面" />
+      <div class="stagenote" id="stageNote"></div>
     </div>
 
     <div class="prevFoot">
@@ -276,7 +279,12 @@ const $ = (id) => document.getElementById(id);
 const TPL_LABEL = { studio:"经典工坊", celebration:"Celebration", soft:"Soft", pop:"Pop",
                     night:"Night", diorama:"Diorama" };
 let chosen = null, currentStyle = "ink", currentMode = "auto", currentTemplate = "night";
-let pollTimer = null, currentJob = null, viewMode = "3d";
+let pollTimer = null, currentJob = null, viewMode = "static", readyTimer = null;
+function note(msg) {
+  const el = $("stageNote");
+  if (!msg) { el.style.display = "none"; el.textContent = ""; return; }
+  el.textContent = msg; el.style.display = "block";
+}
 
 function toast(msg, isErr) {
   const el = document.createElement("div");
@@ -502,10 +510,22 @@ function showView(id, mode) {
   $("viewer").style.display = is3d ? "block" : "none";
   $("staticView").style.display = mode === "static" ? "block" : "none";
   $("backView").style.display = mode === "back" ? "block" : "none";
+  clearTimeout(readyTimer);
+  if (!is3d) note("");
   if (is3d) {
     const f = $("viewer");
+    note("正在加载 3D…(若长时间无反应会自动切回静态图)");
     if (f.dataset.id !== id) { f.dataset.id = id; f.src = "/p/" + id + "/"; }
     setTimeout(embedify, 400);
+    // 3D 就绪检测: 8 秒内没 ready 就回退到静态图, 保证预览区一定有东西
+    readyTimer = setTimeout(() => {
+      const h = holo();
+      if (h && h.ready) { note("可拖动旋转 · 右上「翻转/自动/重置」"); setTimeout(() => note(""), 2500); return; }
+      note("3D 未就绪, 已切到静态图(可点「↗ 在新窗口打开」看 3D)");
+      $("viewModes").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.m === "static"));
+      viewMode = "static";
+      showView(id, "static");
+    }, 8000);
   }
   if (mode === "static") $("staticView").src = "/cardimg/" + id + "/static.png?t=" + Date.now();
   if (mode === "back") $("backView").src = "/cardimg/" + id + "/static-back.png?t=" + Date.now();

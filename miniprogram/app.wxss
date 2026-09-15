@@ -1,0 +1,115 @@
+/* ============ 设计令牌(简约白) ============ */
+page {
+  --paper: #ffffff;
+  --paper-soft: #f2f3f5;
+  --ink: #16181d;
+  --ink-muted: #6c727e;
+  --ink-faint: #9ca2ae;
+  --hair: #e4e6eb;
+  --gold: #b08a3e;
+
+  background: var(--paper);
+  color: var(--ink);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 英文小字统一用衬线 + 字距, 和卡片上的排版语言一致 */
+.latin {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hair {
+  height: 1rpx;
+  background: var(--hair);
+}
+
+/* 自绘顶栏(系统栏隐藏) */
+.bar {
+  position: relative;
+  z-index: 5;
+}
+
+.bar-in {
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32rpx;
+}
+
+.bar-right {
+  display: flex;
+  align-items: center;
+}
+
+/* 顶栏细线图标 */
+.ico {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 22rpx;
+  border: 1rpx solid var(--hair);
+  background: #ffffff;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.ico + .ico {
+  margin-left: 16rpx;
+}
+
+.ico::after,
+.ico::before {
+  content: "";
+  position: absolute;
+  background: #3a3e48;
+}
+
+.ico.back::before {
+  width: 18rpx;
+  height: 2rpx;
+  left: 22rpx;
+  top: 30rpx;
+  transform: rotate(-45deg);
+  transform-origin: left center;
+  box-shadow: 0 18rpx 0 0 #3a3e48;
+}
+
+.ico.back::after {
+  width: 2rpx;
+  height: 26rpx;
+  left: 20rpx;
+  top: 19rpx;
+}
+
+.ico.save::before {
+  width: 2rpx;
+  height: 20rpx;
+  left: 31rpx;
+  top: 20rpx;
+}
+
+.ico.save::after {
+  width: 22rpx;
+  height: 2rpx;
+  left: 21rpx;
+  top: 46rpx;
+  box-shadow: none;
+}
+
+.ico.share {
+  padding: 0;
+  margin: 0 0 0 16rpx;
+  line-height: 1;
+}
+
+.ico.share::before {
+  width: 4rpx;
+  height: 4rpx;
+  border-radius: 50%;
+  left: 20rpx;
+  top: 22rpx;
+  box-shadow: 20rpx 8rpx 0 0 #3a3e48, 20rpx -8rpx 0 0 #3a3e48;
+}

@@ -1,0 +1,18 @@
+{
+  "description": "卡片工坊 · 我的收藏（小程序）",
+  "appid": "touristappid",
+  "projectname": "card-collection",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "libVersion": "3.5.5",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false,
+    "ignoreDevUnusedFiles": false,
+    "checkInvalidKey": true
+  },
+  "condition": {}
+}

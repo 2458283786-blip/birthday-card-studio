@@ -309,14 +309,35 @@ def render_back(tpl, cfg):
         d.rectangle([56, 56, w - 57, h - 57], outline=S["gold"] + (130,), width=1)
         for (x, y) in [(86, 86), (w - 86, 86), (86, h - 86), (w - 86, h - 86)]:
             _star(d, x, y, 7, S["gold"] + (200,))
+    # 背面 = 卡牌身份证: 只用最少的字段(简约), 全部自动适配宽度, 绝不超出内框
     ink, gold = S["ink"] + (255,), S["gold"] + (255,)
     fam = BLACK if style == "pop" else SERIF
-    # 背面 = 卡牌身份证: 只放 CARD # 与日期(可选 Created/Owned/QR), 不放主题文案
-    tracked(d, (512, 312), cfg.get("edition") or "", f(SANS, 20), gold, 2.4, True)
+    SAFE_W = 780                      # 内框安全宽度(左右各留边)
+    qr_cfg = cfg.get("qr") or {}
+    has_qr = bool(qr_cfg.get("enabled") and qr_cfg.get("matrix"))
+    text_w = 560 if has_qr else SAFE_W       # 有二维码时收窄正文, 避免相撞
+
+    def fit(text, fam2, size, max_w, tracking=0.0, min_size=13):
+        """字号自适应: 先缩字号, 仍放不下再截断加省略号。"""
+        t = str(text)
+        s = size
+        while s > min_size:
+            fnt = f(fam2, s)
+            if d.textlength(t, font=fnt) + tracking * max(0, len(t) - 1) <= max_w:
+                return fnt, t
+            s -= 1
+        fnt = f(fam2, min_size)
+        while len(t) > 3 and d.textlength(t + "…", font=fnt) + tracking * len(t) > max_w:
+            t = t[:-1]
+        return fnt, (t + "…" if t != str(text) else t)
+
+    # ① 身份: CARD #
+    if cfg.get("edition"):
+        fnt, t = fit(cfg["edition"], SANS, 20, 520, 2.4)
+        tracked(d, (512, 312), t, fnt, gold, 2.4, True)
     d.line([(432, 348), (592, 348)], fill=S["ink"] + (80,), width=1)
-    if cfg.get("collection"):
-        tracked(d, (512, 384), cfg["collection"], ftext(cfg["collection"], 13, "sansb"),
-                S["ink"] + (155,), 3.4, True)
+
+    # ② 年龄水印(纯装饰)
     age = str(cfg.get("age") or "").strip()
     if age:
         wm = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -328,53 +349,35 @@ def render_back(tpl, cfg):
         im.alpha_composite(wm)
     d = ImageDraw.Draw(im)
     if cfg.get("title"):
-        tracked(d, (512, 900), cfg["title"], ftext(cfg["title"], 86 if style == "pop" else (84 if style == "celebration" else 92), "serif"),
-                ink, 2, True)
+        fnt, t = fit(cfg["title"], fam, 86 if style == "pop" else 92, SAFE_W, 2)
+        tracked(d, (512, 900), t, fnt, ink, 2, True)
     _star(d, 512, 940, 5, S["ink"] + (140,))
     d.line([(392, 940), (486, 940)], fill=S["ink"] + (70,), width=1)
     d.line([(538, 940), (632, 940)], fill=S["ink"] + (70,), width=1)
-    if cfg.get("tagline"):
-        tracked(d, (512, 982), cfg["tagline"], f(SANS, 16), S["ink"] + (160,), 5.5, True)
-    # 背面描述(有才显示, 自动折行)
-    desc = str(cfg.get("description") or "").strip()
-    if desc:
-        words, line, lines = desc.split(), "", []
-        for wd in words:
-            if len(line) + len(wd) + 1 > 34 and line:
-                lines.append(line)
-                line = wd
-            else:
-                line = (line + " " + wd).strip()
-        if line:
-            lines.append(line)
-        for i, ln in enumerate(lines[:2]):
-            tracked(d, (512, 1046 + i * 26), ln, ftext(ln, 14), S["ink"] + (135,), 1.6, True)
-    # 收藏凭证区: Card ID 已在顶部; 其余字段有数据才显示(不留占位)
-    d.line([(372, 1128), (652, 1128)], fill=S["ink"] + (60,), width=1)
+
+    # ③ 凭证区(只保留 4 行以内): 名字 / 日期 / 祝福 / 归属(合并一行)
+    d.line([(372, 1104), (652, 1104)], fill=S["ink"] + (60,), width=1)
     if cfg.get("name"):
-        tracked(d, (512, 1150), "FOR " + str(cfg["name"]).upper(), ftext(cfg["name"], 16, "sansb"),
-                ink, 4.0, True)
+        fnt, t = fit("FOR " + str(cfg["name"]).upper(), SANS_SB, 17, text_w, 3.4)
+        tracked(d, (512, 1148), t, fnt, ink, 3.4, True)
     if cfg.get("technique"):
-        tracked(d, (512, 1206), cfg["technique"], f(SANS, 22), gold, 2.0, True)
+        fnt, t = fit(cfg["technique"], SANS, 23, text_w, 2.0)
+        tracked(d, (512, 1204), t, fnt, gold, 2.0, True)
     if cfg.get("wish"):
-        tracked(d, (512, 1258), cfg["wish"], ftext(cfg["wish"], 21, "serif"),
-                S["ink"] + (190,), 0.6, True)
+        fnt, t = fit(cfg["wish"], SERIF, 21, text_w, 0.6)
+        tracked(d, (512, 1256), t, fnt, S["ink"] + (190,), 0.6, True)
+    owners = " · ".join(x for x in [("CREATED BY " + str(cfg["createdBy"]).upper()) if cfg.get("createdBy") else "",
+                                    ("OWNED BY " + str(cfg["ownedBy"]).upper()) if cfg.get("ownedBy") else ""] if x)
+    if owners:
+        fnt, t = fit(owners, SANS, 13, text_w, 2.6)
+        tracked(d, (512, 1320), t, fnt, S["ink"] + (150,), 2.6, True)
 
-    def field(label, y, value):
-        if not value:
-            return
-        tracked(d, (512, y), label, f(SANS, 12), S["ink"] + (150,), 3.2, True)
-        tracked(d, (512, y + 30), value, f(SANS, 17), ink, 1.0, True)
-
-    field("CREATED BY", 1330, cfg.get("createdBy") or "")
-    field("OWNED BY", 1396, cfg.get("ownedBy") or "")
-
-    # 二维码(§11 有就展示): 低右角小方块, 融入卡背设计, 不做商品包装式大黑白码
+    # ④ 二维码(可选): 低右角, 与正文互不重叠
     qr = cfg.get("qr") or {}
     if qr.get("enabled") and qr.get("matrix"):
         m = qr["matrix"]
         n = len(m)
-        box, pad = 132, 12
+        box, pad = 118, 10
         x0 = w - 92 - box
         y0 = h - 92 - box
         tile = Image.new("RGBA", (w, h), (0, 0, 0, 0))

@@ -1,0 +1,33 @@
+<!-- 收藏馆: 白底 · 一行两个 · 只写卡号和日期 -->
+<view class="page" style="padding-top:{{statusBar}}px">
+
+  <view class="head">
+    <text class="latin brand">Collection</text>
+    <text class="latin count">{{countText}}</text>
+  </view>
+  <view class="hair"></view>
+
+  <view class="grid" wx:if="{{cards.length}}">
+    <view
+      class="cell"
+      wx:for="{{cards}}"
+      wx:key="cardId"
+      id="t-{{item.cardId}}"
+      data-id="{{item.cardId}}"
+      bindtap="onOpen"
+    >
+      <view class="thumb">
+        <image class="thumb-img" src="{{item.flat}}" mode="aspectFill" lazy-load />
+      </view>
+      <view class="latin id">{{item.displayId}}</view>
+      <view class="latin date">{{item.dateText}}</view>
+    </view>
+  </view>
+
+  <!-- 空态: 不留空卡框 -->
+  <view class="empty" wx:else>
+    <view class="empty-title">还没有卡</view>
+    <view class="empty-sub">做好第一张卡后，它会出现在这里</view>
+  </view>
+
+</view>

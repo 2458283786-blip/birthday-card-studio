@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0",
+  "cardId": "CARD-0001",
+  "displayId": "CARD #0001",
+  "internalId": "69ab6801f66f45b9",
+  "theme": "birthday",
+  "template": "birthday-night",
+  "title": "YOUR DAY",
+  "date": "2026-09-09",
+  "creator": {
+    "id": "",
+    "name": ""
+  },
+  "owner": {
+    "id": "",
+    "name": ""
+  },
+  "content": {
+    "age": "20",
+    "subtitle": "HAPPY BIRTHDAY",
+    "message": "MAY EVERY YEAR BE KIND TO YOU",
+    "signature": "A DAY WORTH KEEPING",
+    "name": null
+  },
+  "material": {
+    "type": "pearl",
+    "holoEnabled": true,
+    "foil": 0.55,
+    "regions": {},
+    "amounts": {}
+  },
+  "interaction": {
+    "parallax": true,
+    "flip": true,
+    "holo": true
+  },
+  "media": {
+    "type": "image",
+    "src": "front.png",
+    "poster": "preview/front.jpg"
+  },
+  "qr": {
+    "enabled": false,
+    "target": "showcase",
+    "url": null
+  },
+  "status": "final",
+  "cardVersion": 1,
+  "hasBack": true,
+  "layerNames": [
+    "background",
+    "subject",
+    "effects",
+    "lineart",
+    "text"
+  ],
+  "surface": "dark"
+}

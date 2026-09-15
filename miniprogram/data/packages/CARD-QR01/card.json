@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1.0",
+  "cardId": "CARD-QR01",
+  "displayId": "CARD #QR01",
+  "internalId": "e90f06bfbc974000",
+  "theme": "birthday",
+  "template": "birthday-night",
+  "title": null,
+  "date": "2026-09-11",
+  "creator": {
+    "id": "",
+    "name": ""
+  },
+  "owner": {
+    "id": "",
+    "name": ""
+  },
+  "content": {
+    "age": "20",
+    "subtitle": "HAPPY BIRTHDAY",
+    "message": "KEEP GOING",
+    "signature": null,
+    "name": "小明"
+  },
+  "material": {
+    "type": "pearl",
+    "holoEnabled": true,
+    "foil": 0.52,
+    "regions": {
+      "frame": "pearl",
+      "text": "matte",
+      "subject": "pearl",
+      "background": "pearl"
+    },
+    "amounts": {
+      "frame": 0.5,
+      "subject": 0.35,
+      "background": 0.35
+    }
+  },
+  "interaction": {
+    "parallax": true,
+    "flip": true,
+    "holo": true,
+    "deviceMotion": true,
+    "motionStrength": 0.75
+  },
+  "media": {
+    "type": "image",
+    "src": "front.png",
+    "poster": "preview/front.jpg",
+    "video": null
+  },
+  "qr": {
+    "enabled": true,
+    "target": "showcase",
+    "url": "https://example.com/card/CARD-0001"
+  },
+  "status": "final",
+  "cardVersion": 1,
+  "hasBack": true,
+  "layerNames": [
+    "background",
+    "subject",
+    "effects",
+    "lineart",
+    "text"
+  ],
+  "surface": "dark"
+}
