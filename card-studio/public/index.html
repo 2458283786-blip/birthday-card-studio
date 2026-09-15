@@ -3,414 +3,532 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>卡片工坊 · 拖图出全息卡</title>
+<title>卡片工坊 · Card Studio</title>
 <style>
-  :root { --ink:#241f1a; --gold:#b8862d; --paper:#f6f1e6; --line:#e5ddcc; --ok:#2f7d4f; --bad:#b23b2e; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; background:var(--paper); color:var(--ink); }
-  header { background:linear-gradient(135deg,#241f1a,#4a3826); color:#f4e9d2; padding:18px 28px; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
-  header h1 { margin:0; font-size:22px; letter-spacing:2px; }
-  header .sub { opacity:.75; font-size:13px; }
-  main { max-width:1060px; margin:0 auto; padding:22px 18px 60px; }
-  .card { background:#fffdf8; border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin-bottom:18px; box-shadow:0 2px 10px rgba(60,40,10,.05); }
-  h2 { font-size:15px; margin:0 0 10px; color:#5a4630; }
-  /* 拖放区 */
-  #drop { border:2px dashed #c9b98f; border-radius:14px; padding:26px; text-align:center; cursor:pointer; transition:.2s; background:#fdfbf4; }
-  #drop.over { border-color:var(--gold); background:#f8f0dd; }
-  #drop .big { font-size:17px; margin-bottom:6px; }
-  #drop .small { color:#8a7a5f; font-size:13px; }
-  #preview { display:none; align-items:center; gap:14px; margin-top:12px; }
-  #preview img { max-height:120px; border-radius:8px; border:1px solid var(--line); background:#fff; }
-  /* 风格选择 */
-  .styles { display:flex; gap:10px; flex-wrap:wrap; }
-  .style { border:2px solid var(--line); border-radius:10px; padding:8px 12px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:8px; background:#fff; }
-  .style .sw { width:22px; height:22px; border-radius:6px; border:1px solid #ddd; }
-  .style.on { border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
-  /* 表单 */
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
-  label { display:block; font-size:12px; color:#7a6a50; margin-bottom:4px; }
-  input, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; }
-  .full { grid-column:1 / -1; }
-  .btn { border:0; border-radius:10px; padding:12px 22px; font-size:15px; cursor:pointer; background:linear-gradient(135deg,#b8862d,#8a5f16); color:#fff; box-shadow:0 2px 6px rgba(140,100,20,.3); }
-  .btn:disabled { background:#c9c2b2; cursor:not-allowed; box-shadow:none; }
-  /* 任务 */
-  .job { border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:10px; background:#fff; }
-  .job .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
-  .st-queued .dot{background:#c9a24b}.st-running .dot{background:#3b82c4}.st-running .dot{animation:blink 1s infinite}
-  .st-done .dot{background:var(--ok)}.st-error .dot{background:var(--bad)}
-  @keyframes blink { 50% { opacity:.25 } }
-  pre#log { background:#221d18; color:#e8d9b8; border-radius:10px; padding:12px; font-size:12px; line-height:1.5; max-height:220px; overflow:auto; white-space:pre-wrap; display:none; }
-  iframe#viewer { width: 100%; height: min(82vh, 860px); border: 1px solid var(--line); border-radius: 12px; background: #fff; display: none; }
-  .pathbox { background:#f3ede0; border-radius:8px; padding:8px 10px; font-size:12px; color:#5a4a33; word-break:break-all; margin-top:8px; }
-  .muted { color:#8a7a5f; font-size:12px; }
+  :root{
+    --bg:#fafafa; --surf:#fffdf6; --ink:#242625; --mut:#666d65; --line:#e6ddd7;
+    --clay:#a34829; --green:#42645b; --gold:rgba(230,180,80,.55);
+    --shadow:0 1px 2px rgba(36,38,37,.05), 0 8px 24px rgba(36,38,37,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;}
+  button,input,select{font:inherit;color:inherit}
+  .topbar{height:58px;display:flex;align-items:center;gap:10px;padding:0 20px;
+          background:var(--surf);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
+  .brand{font-size:18px;font-weight:700;letter-spacing:.5px}
+  .brand small{font-weight:400;color:var(--mut);font-size:12px;margin-left:10px;letter-spacing:1px}
+  .spacer{flex:1}
+  .tbtn{height:34px;padding:0 14px;border:1px solid var(--line);background:#fff;border-radius:17px;
+        cursor:pointer;display:flex;align-items:center;gap:7px;transition:.15s}
+  .tbtn:hover{border-color:#d8cec4;box-shadow:var(--shadow)}
+  .tbtn[disabled]{opacity:.5;cursor:not-allowed}
+  .dot{width:8px;height:8px;border-radius:50%;background:#b9b2a9}
+  .dot.on{background:var(--green)}
+  .layout{display:grid;grid-template-columns:372px minmax(0,1fr);gap:18px;padding:18px 20px 76px;
+          height:calc(100vh - 58px)}
+  .left{display:flex;flex-direction:column;gap:14px;overflow:auto;padding-right:2px}
+  .right{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .card{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:14px 14px 16px}
+  .card > h2{margin:0 0 12px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .card > h2 .n{display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--green);
+                color:#fff;font-size:11px;align-items:center;justify-content:center}
+  .muted{color:var(--mut);font-size:12px;line-height:1.6}
+  #drop{position:relative;border:2px dashed #cfc5b9;border-radius:10px;height:158px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;
+        background:
+          linear-gradient(45deg,#f7f5f0 25%,transparent 25%,transparent 75%,#f7f5f0 75%) 0 0/16px 16px,
+          linear-gradient(45deg,#f7f5f0 25%,transparent 25%,transparent 75%,#f7f5f0 75%) 8px 8px/16px 16px;
+        transition:.15s}
+  #drop:hover,#drop.hot{border-color:var(--clay);background-color:#fdf6f2}
+  #drop .hint{background:rgba(255,253,246,.86);border-radius:8px;padding:8px 14px}
+  #preview{display:none;align-items:center;gap:12px;margin-top:10px}
+  #preview img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid .full{grid-column:1/-1}
+  label{display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
+  input{width:100%;height:38px;padding:0 11px;border:1px solid var(--line);
+        border-radius:8px;background:#fff;outline:none;transition:.15s}
+  input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(66,100,91,.12)}
+  details.adv{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  details.adv summary{cursor:pointer;font-size:13px;list-style:none;display:flex;gap:6px;align-items:center}
+  details.adv summary::marker{content:""}
+  details.adv[open] summary{color:var(--green)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:17px;padding:7px 14px;cursor:pointer;
+        font-size:13px;transition:.15s;user-select:none}
+  .chip:hover{border-color:#d8cec4}
+  .chip.on{background:#fdf4ee;border-color:var(--clay);color:var(--clay);font-weight:600}
+  .chip.locked{opacity:.55;cursor:not-allowed}
+  .chip.fam{border-radius:10px;padding:9px 16px}
+  .prevHead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .prevHead .sec{font-size:14px;font-weight:700}
+  .modes{display:flex;gap:6px;background:#fff;border:1px solid var(--line);border-radius:19px;padding:4px}
+  .modes button{border:0;background:transparent;border-radius:15px;padding:6px 14px;cursor:pointer;font-size:13px}
+  .modes button.on{background:#eef2ef;color:var(--green);font-weight:600}
+  .stage{flex:1;min-height:280px;border-radius:14px;background:#26282a;position:relative;overflow:hidden}
+  .stage iframe{width:100%;height:100%;border:0;display:none}
+  .stage img{width:100%;height:100%;object-fit:contain;display:none}
+  .stage .empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;
+        align-items:center;justify-content:center;color:#c9c4bd;text-align:center;padding:20px}
+  .prevFoot{display:flex;align-items:center;gap:12px;background:var(--surf);border:1px solid var(--line);
+        border-radius:12px;padding:12px 14px;flex-wrap:wrap}
+  .prevFoot .meta b{font-size:14px}
+  .btn{height:38px;padding:0 20px;border:0;border-radius:19px;background:var(--green);color:#fff;
+       cursor:pointer;font-weight:600;transition:.15s}
+  .btn:hover{filter:brightness(1.06)}
+  .btn.clay{background:var(--clay)}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);font-weight:500}
+  .btn[disabled]{opacity:.45;cursor:not-allowed}
+  .steps{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--mut)}
+  .steps span{display:flex;align-items:center;gap:5px}
+  .steps i{width:14px;height:14px;border-radius:50%;border:1.5px solid #cfc8bd;display:inline-block}
+  .steps i.done{background:var(--green);border-color:var(--green)}
+  .steps i.cur{border-color:var(--clay);background:#fdf4ee}
+  .histBar{position:fixed;left:20px;right:20px;bottom:12px;height:44px;background:var(--surf);
+        border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;gap:12px;
+        padding:0 16px;cursor:pointer;z-index:30;box-shadow:var(--shadow)}
+  .histBar b{font-size:13px}
+  .histDrawer{position:fixed;left:20px;bottom:64px;width:min(640px,calc(100vw - 40px));max-height:52vh;
+        overflow:auto;background:var(--surf);border:1px solid var(--clay);border-radius:12px;
+        padding:12px;z-index:35;box-shadow:0 12px 40px rgba(36,38,37,.18);display:none}
+  .histDrawer.open{display:block}
+  .row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px}
+  .row+.row{border-top:1px solid var(--line)}
+  .row:hover{background:#fbf9f4}
+  .thumb{width:30px;height:44px;border-radius:4px;background:#4a515a;flex:none}
+  .row .info{min-width:0;flex:1}
+  .row .info b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .acts{display:flex;gap:6px;flex:none}
+  .mini{height:28px;padding:0 11px;font-size:12px;border-radius:14px;border:1px solid var(--line);
+        background:#fff;cursor:pointer}
+  .mini:hover{border-color:#d8cec4}
+  .mini.c{background:var(--clay);color:#fff;border-color:var(--clay)}
+  .mini[disabled]{opacity:.45;cursor:not-allowed}
+  .log{margin:10px 0 0;padding:10px;background:#26282a;color:#d8d4cd;border-radius:8px;
+       font:11.5px/1.6 Consolas,monospace;max-height:150px;overflow:auto;display:none;white-space:pre-wrap}
+  dialog{border:0;border-radius:14px;padding:18px;background:var(--surf);box-shadow:0 20px 60px rgba(36,38,37,.25);
+         max-width:820px;width:calc(100vw - 48px)}
+  dialog::backdrop{background:rgba(36,38,37,.35)}
+  #toasts{position:fixed;right:20px;bottom:70px;display:flex;flex-direction:column;gap:8px;z-index:60}
+  .toast{background:#26282a;color:#f2efe9;padding:10px 16px;border-radius:10px;font-size:13px;
+         box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:420px}
+  .toast.err{background:#7d2f22}
+  .tplPreview{margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+  .tplPreview img{width:100%;display:block}
+  @media (max-width:1080px){
+    .layout{grid-template-columns:1fr;height:auto;padding-bottom:80px}
+    .stage{min-height:420px}
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>卡片工坊</h1>
-  <span class="sub">拖一张图 → 得到一张会流光、能拖转、带景深的 3D 全息卡(纯本机程序化生成)</span>
+
+<header class="topbar">
+  <div class="brand">卡片工坊<small>CARD STUDIO</small></div>
+  <div class="spacer"></div>
+  <button class="tbtn" id="aiBtn" title="AI 辅助(下一步接入: 语义判读 / 选色 / 版式建议)">
+    <span class="dot" id="aiDot"></span>AI 辅助
+  </button>
+  <button class="tbtn" id="exportCenter">📦 导出中心</button>
+  <button class="tbtn" id="histBtnTop">🗂 历史记录</button>
 </header>
-<main>
-  <div class="card">
-    <h2>① 放入图片</h2>
-    <div id="drop">
-      <div class="big">🖼️ 把图片拖到这里，或点一下选择</div>
-      <div class="small">支持 PNG / JPG / WebP。透明底、棋盘格底、纯色底可自动处理；复杂背景<b>默认保留整图不硬抠</b>。</div>
-    </div>
-    <input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-    <div id="preview">
-      <img id="thumb" alt="预览" />
-      <div><b id="fname"></b><br /><span class="muted" id="fsize"></span></div>
-    </div>
-  </div>
 
-  <div class="card">
-    <h2>② 卡片设置(不填也有默认值)</h2>
-    <label>生成模板</label>
-    <div class="styles" id="templates" style="margin-bottom:6px">
-      <div class="style on" data-v="studio"><span class="sw" style="background:linear-gradient(135deg,#efe9db,#b8862d)"></span>经典工坊风格</div>
-      <div class="style" data-v="celebration"><span class="sw" style="background:linear-gradient(135deg,#fbf6ec,#e8796a)"></span>Birthday · Celebration 明亮</div>
-      <div class="style" data-v="soft"><span class="sw" style="background:linear-gradient(135deg,#f7f2ea,#c8a97e)"></span>Birthday · Soft 温柔</div>
-      <div class="style" data-v="pop"><span class="sw" style="background:linear-gradient(135deg,#fffdf6,#2b4cff)"></span>Birthday · Pop 大胆</div>
-      <div class="style" data-v="night"><span class="sw" style="background:linear-gradient(135deg,#0b101c,#dec9a0)"></span>Birthday · Night 高级</div>
-      <div class="style" data-v="diorama"><span class="sw" style="background:linear-gradient(135deg,#06090f,#e8c98a)"></span>Birthday · Diorama 立体(备选)</div>
-    </div>
-    <div class="muted" style="margin-bottom:12px">五套 Birthday 模板共用一条流程: 纸张/印刷质感 + 排版化构图 + 身份证背面, 并额外产出<b>静态卡面 PNG</b>(正片/背面/展示图)。</div>
-    <div class="muted" id="tplHint" style="margin:-6px 0 12px"></div>
-    <div id="tplPreviewWrap" style="margin:0 0 14px;display:none">
-      <img id="tplPreview" alt="模板字段落位图"
-           style="width:100%;max-width:620px;border-radius:10px;border:1px solid var(--line);display:block" />
-      <div class="muted" style="margin-top:6px">图上编号 = 字段在卡面上的落位,右侧图例是字段名(点开图可放大看)</div>
-    </div>
-    <label>图片处理方式</label>
-    <div class="styles" id="modes" style="margin-bottom:6px">
-      <div class="style on" data-v="auto"><span class="sw" style="background:conic-gradient(#f6f1e6,#b8862d,#f6f1e6,#c9b98f,#f6f1e6)"></span>自动判断(推荐)</div>
-      <div class="style" data-v="keep"><span class="sw" style="background:repeating-linear-gradient(45deg,#fff 0 8px,#e8e2d4 8px 16px)"></span>保留整图(不抠)</div>
-      <div class="style" data-v="cut"><span class="sw" style="background:radial-gradient(circle at 50% 45%,#c0392b 0 26%,#fff 27% 100%)"></span>扣除纯色底</div>
-    </div>
-    <div class="muted" style="margin-bottom:12px">自动判断：透明/棋盘格→抠出当主体；<b>只有纯色底才抠图</b>（保守力度，浅色衣物不误伤）；其余情况整图保留、两侧衬底。</div>
-    <label>背景风格</label>
-    <div id="styleBlock">
-    <div class="styles" id="styles">
-      <div class="style on" data-s="ink"><span class="sw" style="background:radial-gradient(#efe9db,#d9cfb6)"></span>宣纸墨韵</div>
-      <div class="style" data-s="space"><span class="sw" style="background:radial-gradient(#2a3568,#0b0f24)"></span>深空星夜</div>
-      <div class="style" data-s="blackgold"><span class="sw" style="background:radial-gradient(#7a5a2e,#16110d)"></span>玄黑烫金</div>
-      <div class="style" data-s="plain"><span class="sw" style="background:radial-gradient(#f5f0e4,#e6ddc8)"></span>素雅米白</div>
-    </div>
-    </div>
-    <div class="grid" style="margin-top:14px">
-      <div id="row_title"><label>卡名(Night 显示为顶部 FOR 行)</label><input id="f_title" placeholder="自动取文件名" /></div>
-      <div id="row_subtitle"><label>副标题(如 系列/角色称号)</label><input id="f_subtitle" /></div>
-      <div id="row_age"><label>年龄(Night 高级款的核心视觉)</label><input id="f_age" placeholder="如 20;留空则不显示" /></div>
-      <div id="row_technique"><label>日期</label><input id="f_technique" placeholder="2026.09.09" /></div>
-      <div id="row_wish"><label>祝福语(卡底一行)</label><input id="f_wish" placeholder="MAY EVERY YEAR BE KIND TO YOU" /></div>
-      <div id="row_tagline"><label>一句话(经典模板用)</label><input id="f_tagline" /></div>
-      <div id="row_name"><label>名字(可选, 显示为 FOR NAME)</label><input id="f_name" /></div>
-      <div id="row_edition"><label>编号</label><input id="f_edition" placeholder="NO.001 / 001" /></div>
-      <div id="row_collection"><label>系列名</label><input id="f_collection" value="我的全息典藏" /></div>
-      <div class="full" id="row_desc"><label>背面描述</label><input id="f_desc" placeholder="这张卡的一句话…" /></div>
-      <div class="full" id="row_qr"><label>二维码链接(可选,填了就印在背面右下角)</label><input id="f_qr" placeholder="https://… 留空则背面不显示二维码" /></div>
-    </div>
-  </div>
+<main class="layout">
+  <aside class="left">
+    <section class="card">
+      <h2><span class="n">1</span>添加图片</h2>
+      <div id="drop">
+        <div class="hint">
+          <b>拖入照片</b> · 点击选择 · 也可 Ctrl+V 粘贴<br />
+          <span class="muted">JPG / PNG / WebP · 透明底或纯色底的抠图也能用</span>
+        </div>
+      </div>
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+      <div id="preview"><img id="thumb" alt="预览" /><div><b id="fname"></b><br /><span class="muted" id="fsize"></span></div></div>
+    </section>
 
-  <div class="card">
-    <button class="btn" id="go" disabled>✨ 生成全息卡(约 1~3 分钟)</button>
-    <div class="muted" style="margin-top:8px">每张卡会独立存放在「card-studio\projects」文件夹，含可编辑 Blender 工程 card.blend。</div>
-  </div>
+    <section class="card">
+      <h2><span class="n">2</span>卡片信息</h2>
+      <div class="grid" id="fields">
+        <div id="row_title"><label>卡名</label><input id="f_title" placeholder="自动取文件名" /></div>
+        <div id="row_subtitle"><label>副标题</label><input id="f_subtitle" placeholder="HAPPY BIRTHDAY" /></div>
+        <div id="row_age"><label>年龄</label><input id="f_age" placeholder="20" /></div>
+        <div id="row_technique"><label>日期</label><input id="f_technique" placeholder="2026.09.11" /></div>
+        <div id="row_name"><label>名字(显示 FOR 某某)</label><input id="f_name" /></div>
+        <div id="row_edition"><label>编号</label><input id="f_edition" placeholder="CARD #0001" /></div>
+        <div class="full" id="row_wish"><label>祝福语</label><input id="f_wish" placeholder="MAY EVERY YEAR BE KIND TO YOU" /></div>
+        <div class="full" id="row_tagline"><label>一句话(经典/部分模板)</label><input id="f_tagline" /></div>
+        <div class="full" id="row_collection"><label>系列名(背面)</label><input id="f_collection" value="BIRTHDAY COLLECTIBLE" /></div>
+        <div class="full" id="row_desc"><label>背面描述</label><input id="f_desc" /></div>
+        <div class="full" id="row_qr"><label>二维码链接(可选, 印在背面右下角)</label><input id="f_qr" placeholder="https://… 留空则不显示" /></div>
+      </div>
+      <details class="adv">
+        <summary>▸ 进阶设置 <span class="muted" id="advHint">底色 · 材质 · 景深 · 版面比例</span></summary>
+        <div style="margin-top:12px">
+          <label>图片处理方式</label>
+          <div class="chips" id="modes">
+            <div class="chip on" data-v="auto">自动判断</div>
+            <div class="chip" data-v="keep">保留整图</div>
+            <div class="chip" data-v="cut">扣除纯色底</div>
+          </div>
+          <div id="styleBlock" style="margin-top:12px">
+            <label>背景风格(仅经典模板)</label>
+            <div class="chips" id="styles">
+              <div class="chip on" data-v="ink">宣纸墨韵</div>
+              <div class="chip" data-v="space">深空星夜</div>
+              <div class="chip" data-v="blackgold">玄黑烫金</div>
+              <div class="chip" data-v="plain">素雅米白</div>
+            </div>
+          </div>
+          <div class="muted" style="margin-top:10px">底色 / 材质 / 景深面板下一步接入(能力已就绪, 写进配置即可生效)</div>
+        </div>
+      </details>
+    </section>
 
-  <div class="card" id="jobsCard">
-    <h2>③ 任务与结果</h2>
-    <div id="jobs"><div class="muted">还没有任务。放图 → 生成 → 稍等 → 在下方预览并拖拽旋转。</div></div>
-    <pre id="log"></pre>
-    <div id="openbar" style="display:none;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-      <span class="muted">下方是实时预览：拖拽旋转 / 点底部按钮翻面、自动旋转、调整景深与光泽 / 换卡面质感</span>
-      <a class="btn" id="openTab" href="#" target="_blank" rel="noreferrer" style="padding:8px 16px;font-size:13px;text-decoration:none;color:#fff">↗ 在新窗口打开预览</a>
+    <section class="card">
+      <h2><span class="n">3</span>模板</h2>
+      <label>主题族</label>
+      <div class="chips" id="families">
+        <div class="chip fam on" data-fam="birthday">生日</div>
+        <div class="chip fam locked" data-fam="personal">个人名片</div>
+        <div class="chip fam locked" data-fam="couple">情侣</div>
+      </div>
+      <div id="famBody" style="margin-top:12px">
+        <label>生日 · 款式(选中后下方显示字段落位图)</label>
+        <div class="chips" id="templates">
+          <div class="chip" data-v="studio">经典工坊</div>
+          <div class="chip" data-v="celebration">Celebration</div>
+          <div class="chip" data-v="soft">Soft</div>
+          <div class="chip" data-v="pop">Pop</div>
+          <div class="chip on" data-v="night">Night</div>
+          <div class="chip" data-v="diorama">Diorama</div>
+        </div>
+        <div class="muted" id="tplHint" style="margin-top:10px"></div>
+        <div class="tplPreview" id="tplPreviewWrap"><img id="tplPreview" alt="字段落位图" /></div>
+      </div>
+    </section>
+  </aside>
+
+  <section class="right">
+    <div class="prevHead">
+      <span class="sec">成图预览</span>
+      <div class="modes" id="viewModes">
+        <button data-m="static">正面静帧</button>
+        <button data-m="3d" class="on">3D 拖动</button>
+        <button data-m="back">背面</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="tbtn" id="openTab" disabled>↗ 在新窗口打开</button>
     </div>
-    <iframe id="viewer" title="卡片预览"></iframe>
-  </div>
+
+    <div class="stage" id="stage">
+      <div class="empty" id="stageEmpty">
+        <b style="font-size:16px">还没有成图</b>
+        <span>左侧拖入照片 → 填好信息 → 点「生成卡片」<br />约 6 秒先出静态卡面, 3D 版随后完成</span>
+      </div>
+      <iframe id="viewer" title="卡片预览"></iframe>
+      <img id="staticView" alt="正面静帧" />
+      <img id="backView" alt="背面" />
+    </div>
+
+    <div class="prevFoot">
+      <div class="meta">
+        <b id="curTitle">未选择卡片</b>
+        <div class="muted" id="curMeta">生成后会在这里显示状态与进度</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="steps" id="steps">
+        <span><i id="s1"></i>素材</span><span><i id="s2"></i>静态卡面</span><span><i id="s3"></i>3D</span>
+      </div>
+      <button class="btn" id="go" disabled>✨ 生成卡片</button>
+      <button class="btn clay" id="exportBtn" disabled>📦 导出卡包</button>
+    </div>
+    <pre class="log" id="log"></pre>
+  </section>
 </main>
+
+<div class="histBar" id="histBar"><b>▸ 历史记录(<span id="histCount">0</span>)</b>
+  <span class="muted">点击展开 · 默认收起, 不占版面</span></div>
+<div class="histDrawer" id="histDrawer"></div>
 
 <dialog id="editDialog">
   <h3 id="editTitle" style="margin:0 0 12px;font-size:15px"></h3>
   <div class="grid" id="editFields" style="max-height:56vh;overflow:auto"></div>
-  <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+  <div style="display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap">
     <button class="btn" id="editSave">保存并重出静态卡面</button>
-    <button class="btn" id="editCancel" style="background:#8a8378">取消</button>
-    <span class="muted" id="editNote">只重画文字层与二维码, 不跑 3D</span>
+    <button class="btn ghost" id="editCancel">取消</button>
+    <span class="muted" id="editNote"></span>
   </div>
 </dialog>
 
+<div id="toasts"></div>
+
 <script>
 const $ = (id) => document.getElementById(id);
-let chosen = null, currentStyle = "ink", currentMode = "auto", currentTemplate = "studio", pollTimer = null;
+const TPL_LABEL = { studio:"经典工坊", celebration:"Celebration", soft:"Soft", pop:"Pop",
+                    night:"Night", diorama:"Diorama" };
+let chosen = null, currentStyle = "ink", currentMode = "auto", currentTemplate = "night";
+let pollTimer = null, currentJob = null, viewMode = "3d";
 
-/* 风格与处理方式选择 */
+function toast(msg, isErr) {
+  const el = document.createElement("div");
+  el.className = "toast" + (isErr ? " err" : "");
+  el.textContent = msg;
+  $("toasts").appendChild(el);
+  setTimeout(() => el.remove(), isErr ? 6000 : 3200);
+}
+const val = (id) => (($(id) || {}).value || "").trim();
+
 function bindChips(containerId, onPick) {
-  document.querySelectorAll("#" + containerId + " .style").forEach((el) =>
+  document.querySelectorAll("#" + containerId + " .chip").forEach((el) =>
     el.onclick = () => {
-      document.querySelectorAll("#" + containerId + " .style").forEach((x) => x.classList.remove("on"));
+      if (el.classList.contains("locked")) return;
+      document.querySelectorAll("#" + containerId + " .chip").forEach((x) => x.classList.remove("on"));
       el.classList.add("on");
-      onPick(el.dataset.s || el.dataset.v);
+      onPick(el.dataset.v || el.dataset.fam);
     });
 }
 bindChips("styles", (v) => { currentStyle = v; });
 bindChips("modes", (v) => { currentMode = v; });
-bindChips("templates", (v) => { currentTemplate = v; syncTemplateFields(); });
+bindChips("templates", (v) => { currentTemplate = v; syncTemplate(); });
+$("families").querySelectorAll(".chip").forEach((el) => el.onclick = () => {
+  if (el.dataset.fam !== "birthday") { toast("「" + el.textContent + "」已预留位置, 需求确定后实现"); return; }
+  $("families").querySelectorAll(".chip").forEach((x) => x.classList.remove("on"));
+  el.classList.add("on");
+});
 
-/* 按模板显示真正会用到的字段, 避免"填了却不显示" */
-function syncTemplateFields() {
-  const tpl = currentTemplate;
-  const classic = tpl === "studio";
-  const night = tpl === "night";
+function syncTemplate() {
+  const tpl = currentTemplate, classic = tpl === "studio", night = tpl === "night";
   const show = (id, on) => { const el = $(id); if (el) el.style.display = on ? "" : "none"; };
-  show("styleBlock", classic);           // 背景风格只有经典模板用
-  show("row_age", !classic);             // 年龄: 五套 Birthday 都用, 经典不用
+  show("styleBlock", classic);
+  show("row_age", !classic);
   show("row_name", !classic);
-  show("row_wish", night);               // 祝福语目前只有 Night 用
-  show("row_tagline", classic || tpl === "celebration" || tpl === "soft" || tpl === "diorama");
+  show("row_wish", night);
+  show("row_tagline", classic || ["celebration","soft","diorama"].includes(tpl));
+  $("advHint").textContent = "当前模板: " + (classic ? "经典工坊" : "生日 · " + TPL_LABEL[tpl]);
   $("tplHint").innerHTML = classic
-    ? "当前模板会用到的字段:卡名 · 副标题 · 技法 · 一句话 · 编号 · 系列名 · 背面描述(可用「背景风格」换底色)。"
-    : "当前模板会用到的字段:<b>卡名</b> · 副标题 · 年龄 · 日期 · " +
-      (night ? "<b>祝福语</b> · " : (tpl === "pop" ? "" : "一句话 · ")) +
-      "名字 · 编号 · 系列名 · 背面描述。背景由模板固定, <b>不受「背景风格」影响</b>。";
-  // 字段落位预览图(经典模板由 skill 自带排版决定, 没有落位图)
+    ? "经典模板: 卡名 · 副标题 · 技法 · 一句话 · 编号 · 系列名 · 背面描述;可用「背景风格」换底色。"
+    : "本款会用到: 卡名 · 副标题 · 年龄 · 日期 · " + (night ? "祝福语 · " : (tpl === "pop" ? "" : "一句话 · "))
+      + "名字 · 编号 · 系列名 · 背面描述。";
   const wrap = $("tplPreviewWrap");
-  if (wrap) {
-    wrap.style.display = classic ? "none" : "block";
-    if (!classic) $("tplPreview").src = "/tpl/" + tpl + ".png";
+  if (classic) { wrap.style.display = "none"; }
+  else { wrap.style.display = "block"; $("tplPreview").src = "/tpl/" + tpl + ".png"; }
+}
+
+const drop = $("drop"), file = $("file");
+function load(blob, name) {
+  if (!blob || !blob.type || !blob.type.startsWith("image/")) { toast("请放入图片文件", true); return; }
+  chosen = blob;
+  $("fname").textContent = name || "已选图片";
+  $("fsize").textContent = (blob.size / 1024 / 1024).toFixed(2) + " MB";
+  $("thumb").src = URL.createObjectURL(blob);
+  $("preview").style.display = "flex";
+  drop.style.height = "70px";
+  drop.querySelector(".hint").innerHTML = "<b>已选择图片</b> · 点击可更换";
+  $("go").disabled = false;
+  if (!$("f_title").value) $("f_title").value = (name || "").replace(/\.[^.]+$/, "");
+  toast("图片已就绪, 可以生成卡片");
+}
+drop.onclick = () => file.click();
+file.onchange = () => { if (file.files[0]) load(file.files[0], file.files[0].name); };
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => {
+  e.preventDefault(); drop.classList.add("hot"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => {
+  e.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) load(f, f.name); });
+document.addEventListener("paste", (e) => {
+  const it = [...((e.clipboardData && e.clipboardData.items) || [])].find((i) => i.type.startsWith("image/"));
+  if (it) load(it.getAsFile(), "粘贴的图片");
+});
+
+$("go").onclick = async () => {
+  if (!chosen) { toast("请先放入一张图片", true); return; }
+  const toDataURL = (blob) => new Promise((r) => {
+    const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(blob); });
+  const payload = {
+    imageData: await toDataURL(chosen),
+    title: val("f_title"), subtitle: val("f_subtitle"), technique: val("f_technique"),
+    tagline: val("f_tagline"), edition: val("f_edition"), collection: val("f_collection"),
+    description: val("f_desc"), style: currentStyle, mode: currentMode, template: currentTemplate,
+    age: val("f_age"), wish: val("f_wish"), name: val("f_name"), qrUrl: val("f_qr"), finish: "gold",
+  };
+  try {
+    $("go").disabled = true;
+    const resp = await fetch("/api/generate", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!resp.ok) { toast("提交失败: " + (await resp.text()), true); $("go").disabled = false; return; }
+    const data = await resp.json();
+    currentJob = data.id;
+    $("stageEmpty").style.display = "none";
+    $("log").style.display = "block";
+    setSteps(2, 0, 0);
+    $("curTitle").textContent = "生成中…";
+    $("curMeta").textContent = "素材处理 → 静态卡面 → 3D 组装";
+    startPoll();
+  } catch (err) {
+    toast("无法连接工坊服务: " + err, true);
+    $("go").disabled = false;
+  }
+};
+
+function startPoll() { clearInterval(pollTimer); poll(); pollTimer = setInterval(poll, 1500); }
+function setSteps(s1, s2, s3) {
+  const set = (id, v) => { const el = $(id); el.className = v === 2 ? "cur" : v === 1 ? "done" : ""; };
+  set("s1", s1); set("s2", s2); set("s3", s3);
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+async function poll() {
+  let list = [];
+  try { list = await (await fetch("/api/jobs")).json(); } catch (e) { return; }
+  const done = list.filter((j) => j.status === "done");
+  $("histCount").textContent = done.length;
+  renderHistory(list);
+  const me = currentJob ? list.find((j) => j.id === currentJob) : null;
+  const active = list.filter((j) => j.status === "running" || j.status === "queued").pop();
+  const watch = me || active;
+  if (!watch) return;
+  const lg = await (await fetch("/api/jobs/" + watch.id + "/log")).json().catch(() => ({ lines: [] }));
+  const lines = lg.lines || [];
+  $("log").textContent = lines.slice(-40).join("\n");
+  $("log").scrollTop = $("log").scrollHeight;
+  const title = watch.title && watch.title !== "无题" ? watch.title : "未命名";
+  $("curTitle").textContent = title + " · " + (TPL_LABEL[watch.template] || watch.template || "经典");
+  $("curMeta").textContent = "编号 " + (watch.edition || "—") + " · " + (lines.slice(-1)[0] || "");
+  setSteps(1, watch.staticReady ? 1 : 0, watch.status === "done" ? 1 : (watch.status === "running" ? 2 : 0));
+  if (watch.status === "done") {
+    $("exportBtn").disabled = false;
+    $("openTab").disabled = false;
+    showView(watch.id, viewMode);
+    $("go").disabled = false;
+    clearInterval(pollTimer);
+  } else if (watch.status === "error") {
+    toast("生成出错, 请看下方日志", true);
+    $("go").disabled = false;
+    clearInterval(pollTimer);
+  } else if (watch.staticReady) {
+    showView(watch.id, viewMode);
   }
 }
-syncTemplateFields();
 
-/* 拖放 */
-const drop = $("drop"), file = $("file");
-drop.onclick = () => file.click();
-file.onchange = () => { if (file.files[0]) load(file.files[0]); };
-["dragover", "dragenter"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", (ev) => { if (ev.dataTransfer.files[0]) load(ev.dataTransfer.files[0]); });
-
-function load(f) {
-  if (!/^image\//.test(f.type)) { alert("请放入图片文件"); return; }
-  chosen = f;
-  $("fname").textContent = f.name;
-  $("fsize").textContent = (f.size / 1024 / 1024).toFixed(2) + " MB";
-  $("thumb").src = URL.createObjectURL(f);
-  $("preview").style.display = "flex";
-  if (!$("f_title").value) $("f_title").value = f.name.replace(/\.[^.]+$/, "");
-  $("go").disabled = false;
+function renderHistory(list) {
+  const box = $("histDrawer");
+  if (!list.length) { box.innerHTML = '<div class="muted">还没有记录</div>'; return; }
+  box.innerHTML = list.slice().reverse().map((j) => {
+    const nm = j.title && j.title !== "无题" ? j.title : "未命名";
+    const ok = j.status === "done";
+    return '<div class="row" data-id="' + j.id + '">' +
+      '<div class="thumb"></div>' +
+      '<div class="info"><b>' + esc(nm) + " · " + esc(TPL_LABEL[j.template] || j.template || "经典") + "</b>" +
+      '<span class="muted">' + esc(j.edition || "") + " · " + esc(j.created || "") + " · " +
+      (ok ? (j.staticReady ? "静态 ✓" : "生成中") : esc(j.status)) + "</span></div>" +
+      '<div class="acts">' +
+      '<button class="mini" data-act="view">预览</button>' +
+      '<button class="mini" data-act="edit"' + (ok ? "" : " disabled") + ">改文案</button>" +
+      '<button class="mini c" data-act="export"' + (ok ? "" : " disabled") + ">导出</button>" +
+      "</div></div>";
+  }).join("");
+  box.querySelectorAll(".row").forEach((row) => {
+    const j = list.find((x) => x.id === row.dataset.id);
+    if (!j) return;
+    row.querySelector('[data-act="view"]').onclick = () => selectJob(j);
+    const ed = row.querySelector('[data-act="edit"]');
+    if (ed && !ed.disabled) ed.onclick = () => openEditor(j.id, j.title);
+    const ex = row.querySelector('[data-act="export"]');
+    if (ex && !ex.disabled) ex.onclick = () => exportCard(j.id, ex);
+  });
 }
 
-/* 改文案 → 秒级重出静态卡面(§17 保存当前配置) */
-const EDIT_FIELDS = [
-  ["title", "卡名"], ["subtitle", "副标题"], ["age", "年龄"], ["technique", "日期"],
-  ["edition", "编号"], ["name", "名字"], ["wish", "祝福语(Night)"], ["tagline", "一句话"],
-  ["collection", "系列名(背面)"], ["description", "背面描述"],
-  ["qrUrl", "二维码链接(留空则不显示)"],
-];
+function selectJob(j) {
+  currentJob = j.id;
+  const nm = j.title && j.title !== "无题" ? j.title : "未命名";
+  $("curTitle").textContent = nm + " · " + (TPL_LABEL[j.template] || j.template || "经典");
+  $("curMeta").textContent = "编号 " + (j.edition || "—");
+  $("exportBtn").disabled = j.status !== "done";
+  $("openTab").disabled = j.status !== "done";
+  setSteps(1, j.staticReady ? 1 : 0, j.status === "done" ? 1 : 0);
+  showView(j.id, viewMode);
+  $("histDrawer").classList.remove("open");
+}
+
+$("viewModes").querySelectorAll("button").forEach((b) => b.onclick = () => {
+  $("viewModes").querySelectorAll("button").forEach((x) => x.classList.remove("on"));
+  b.classList.add("on");
+  viewMode = b.dataset.m;
+  if (currentJob) showView(currentJob, viewMode);
+});
+function showView(id, mode) {
+  $("stageEmpty").style.display = "none";
+  $("viewer").style.display = mode === "3d" ? "block" : "none";
+  $("staticView").style.display = mode === "static" ? "block" : "none";
+  $("backView").style.display = mode === "back" ? "block" : "none";
+  if (mode === "3d") $("viewer").src = "/p/" + id + "/";
+  if (mode === "static") $("staticView").src = "/cardimg/" + id + "/static.png?t=" + Date.now();
+  if (mode === "back") $("backView").src = "/cardimg/" + id + "/static-back.png?t=" + Date.now();
+  $("openTab").onclick = () => window.open("/p/" + id + "/", "_blank");
+}
+
+async function exportCard(id, btn) {
+  const old = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "导出中…"; }
+  try {
+    const r = await fetch("/api/export", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    if (!r.ok) { toast("导出失败: " + (await r.text()), true); return; }
+    $("log").style.display = "block";
+    toast("开始导出卡包…");
+    startPoll();
+  } finally { if (btn) { btn.disabled = false; btn.textContent = old || "导出"; } }
+}
+$("exportBtn").onclick = () => { if (currentJob) exportCard(currentJob, null); };
+$("exportCenter").onclick = () => $("histDrawer").classList.add("open");
+$("histBar").onclick = () => $("histDrawer").classList.toggle("open");
+
+const EDIT_FIELDS = [["title","卡名"],["subtitle","副标题"],["age","年龄"],["technique","日期"],
+  ["edition","编号"],["name","名字"],["wish","祝福语"],["tagline","一句话"],
+  ["collection","系列名"],["description","背面描述"],["qrUrl","二维码链接(留空则不显示)"]];
 async function openEditor(id, title) {
   const r = await fetch("/api/config/" + id);
-  if (!r.ok) { alert("读取配置失败"); return; }
+  if (!r.ok) { toast("读取配置失败", true); return; }
   const data = await r.json();
-  const box = $("editFields");
-  box.innerHTML = "";
+  const box = $("editFields"); box.innerHTML = "";
   for (const [k, label] of EDIT_FIELDS) {
     const d = document.createElement("div");
-    const lab = document.createElement("label");
-    lab.textContent = label;
-    const inp = document.createElement("input");
-    inp.id = "e_" + k;
-    inp.value = data.fields[k] || "";
-    d.append(lab, inp);
-    box.appendChild(d);
+    const lab = document.createElement("label"); lab.textContent = label;
+    const inp = document.createElement("input"); inp.id = "e_" + k; inp.value = data.fields[k] || "";
+    d.append(lab, inp); box.appendChild(d);
   }
   $("editTitle").textContent = "改文案 · " + (title || id);
-  $("editNote").textContent = "当前模板: " + data.template + " · 只重画文字层与二维码, 不跑 3D";
+  $("editNote").textContent = "当前模板: " + (TPL_LABEL[data.template] || data.template) + " · 只重画文字层与二维码";
   $("editDialog").dataset.id = id;
   $("editDialog").showModal();
 }
 async function saveEditor() {
   const id = $("editDialog").dataset.id;
-  const body = {};
-  for (const [k] of EDIT_FIELDS) body[k] = $("e_" + k).value;
-  const btn = $("editSave");
-  btn.disabled = true; btn.textContent = "保存中…";
+  const body = {}; for (const f of EDIT_FIELDS) body[f[0]] = $("e_" + f[0]).value;
+  const btn = $("editSave"); btn.disabled = true; btn.textContent = "保存中…";
   try {
-    const r = await fetch("/api/config/" + id, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
+    const r = await fetch("/api/config/" + id, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok || !data.ok) {
-      alert("保存失败:请看任务日志");
-      $("log").style.display = "block";
-      startPoll();
-    } else {
-      $("editDialog").close();
-      $("log").style.display = "block";
-      startPoll();
-    }
-  } catch (err) {
-    alert("保存失败: " + err);
-  }
+    if (!r.ok || !data.ok) toast("保存失败, 请看日志", true);
+    else { $("editDialog").close(); toast("已重出静态卡面"); currentJob = id; showView(id, "static"); }
+  } catch (e) { toast("保存失败: " + e, true); }
   btn.disabled = false; btn.textContent = "保存并重出静态卡面";
 }
 $("editCancel").onclick = () => $("editDialog").close();
 $("editSave").onclick = saveEditor;
+$("aiBtn").onclick = () => toast("AI 辅助尚未接入工作台: 下一步接「语义判读 + 选色 + 版式建议」");
+$("histBtnTop").onclick = () => $("histDrawer").classList.toggle("open");
 
-/* 生成 */
-const val = (id) => (($(id) || {}).value || "").trim();   // 容错取值: 元素不存在也不抛异常
-$("go").onclick = async () => {
-  const toDataURL = (blob) => new Promise((r) => {
-    const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(blob);
-  });
-  if (!chosen) { alert("请先放入一张图片"); return; }
-  const payload = {
-    imageData: await toDataURL(chosen),
-    title: val("f_title"),
-    subtitle: val("f_subtitle"),
-    technique: val("f_technique"),
-    tagline: val("f_tagline"),
-    edition: val("f_edition"),
-    collection: val("f_collection"),
-    description: val("f_desc"),
-    style: currentStyle,
-    mode: currentMode,
-    template: currentTemplate,
-    age: val("f_age"),
-    wish: val("f_wish"),
-    name: val("f_name"),
-    qrUrl: val("f_qr"),
-    finish: "gold",
-  };
-  try {
-    $("go").disabled = true;
-    const resp = await fetch("/api/generate", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-    });
-    if (!resp.ok) {
-      alert("提交失败: " + (await resp.text()));
-      $("go").disabled = false;
-      return;
-    }
-    $("viewer").style.display = "none";
-    $("log").style.display = "block";
-    startPoll();
-  } catch (err) {
-    alert("无法连接工坊服务: " + err + "\n请确认启动窗口还在运行。");
-    $("go").disabled = false;
-  }
-};
-
-/* 轮询任务与日志 */
-function startPoll() {
-  clearInterval(pollTimer);
-  pollTimer = setInterval(poll, 1300);
-  poll();
-}
-async function poll() {
-  let list;
-  try { list = await (await fetch("/api/jobs")).json(); } catch { return; }
-  const box = $("jobs");
-  box.innerHTML = "";
-  if (list.length === 0) { box.innerHTML = '<div class="muted">还没有任务。</div>'; return; }
-  list.slice().reverse().forEach((j) => {
-    const el = document.createElement("div");
-    el.className = "job st-" + j.status;
-    el.innerHTML = `<div class="row"><span class="dot"></span><b>${esc(j.title)}</b>
-      <span class="muted">${esc(j.edition)} · ${esc(j.created)}</span>
-      <span class="muted">${stName(j.status)}</span></div>`;
-    if (j.status === "done") {
-      const b = document.createElement("button");
-      b.className = "btn"; b.textContent = "预览这张卡";
-      b.style.cssText = "padding:5px 12px;font-size:12px;margin-left:auto";
-      b.onclick = () => showViewer(j.id, j.title);
-      el.querySelector(".row").appendChild(b);
-      const edit = document.createElement("button");
-      edit.className = "btn"; edit.textContent = "✏️ 改文案";
-      edit.title = "保存配置并秒级重出静态卡面(不重跑 3D)";
-      edit.style.cssText = "padding:5px 12px;font-size:12px";
-      edit.onclick = () => openEditor(j.id, j.title);
-      el.querySelector(".row").appendChild(edit);
-      if (!j.export || j.export.status === "error") {
-        const e = document.createElement("button");
-        e.className = "btn"; e.textContent = j.export ? "📦 重新导出" : "📦 导出卡牌";
-        e.style.cssText = "padding:5px 12px;font-size:12px";
-        e.onclick = async () => {
-          e.disabled = true; e.textContent = "导出中…";
-          const r = await fetch("/api/export", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: j.id }),
-          });
-          if (!r.ok) { alert("导出失败: " + (await r.text())); e.disabled = false; e.textContent = "📦 导出卡牌"; return; }
-          $("log").style.display = "block";
-          startPoll();
-        };
-        el.querySelector(".row").appendChild(e);
-      } else if (j.export.status === "done") {
-        const a = document.createElement("a");
-        a.className = "btn"; a.textContent = "⬇ 下载卡包";
-        a.href = j.export.url; a.title = j.export.zip;
-        a.style.cssText = "padding:5px 12px;font-size:12px;text-decoration:none;color:#fff";
-        el.querySelector(".row").appendChild(a);
-      } else {
-        const s = document.createElement("span");
-        s.className = "muted"; s.textContent = "导出中…";
-        el.querySelector(".row").appendChild(s);
-      }
-    }
-    // 静态卡面: 一生成好就显示(运行中也能先看, 不必等 3D 流水线)
-    if (j.staticReady) {
-      const wrap = document.createElement("div");
-      wrap.style.cssText = "display:flex;gap:12px;align-items:center;margin-top:10px";
-      wrap.innerHTML =
-        '<img src="/cardimg/' + j.id + '/static-preview.png?t=' + Date.now() + '" alt="静态卡面" ' +
-        'style="height:190px;border-radius:8px;border:1px solid var(--line);background:#0b0f18" ' +
-        'onerror="this.style.display=\'none\'" />' +
-        '<div class="muted">静态卡面' + (j.status === "running" ? "(已可看, 3D 版仍在生成)" : "已生成") + '<br/>' +
-        '<a href="/cardimg/' + j.id + '/static.png" target="_blank">正片 PNG</a> · ' +
-        '<a href="/cardimg/' + j.id + '/static-back.png" target="_blank">背面 PNG</a> · ' +
-        '<a href="/cardimg/' + j.id + '/static-preview.png" target="_blank">展示图</a></div>';
-      el.appendChild(wrap);
-    }
-    box.appendChild(el);
-  });
-  // 找最新运行/错误任务显示日志
-  const active = list.filter((j) => j.status === "running" || j.status === "error").pop();
-  const done = list.filter((j) => j.status === "done").pop();
-  if (active) {
-    $("log").style.display = "block";
-    const lg = await (await fetch("/api/jobs/" + active.id + "/log")).json();
-    $("log").textContent = lg.lines.join("\n");
-    $("log").scrollTop = $("log").scrollHeight;
-    if (active.status === "error") { clearInterval(pollTimer); $("go").disabled = false; }
-  } else if (list.some((j) => j.export && j.export.status === "running")) {
-    const ex = list.find((j) => j.export && j.export.status === "running");
-    $("log").style.display = "block";
-    const lg = await (await fetch("/api/jobs/" + ex.id + "/log")).json();
-    $("log").textContent = lg.lines.join("\n");
-    $("log").scrollTop = $("log").scrollHeight;
-  } else if (done) {
-    $("log").style.display = "none";
-    clearInterval(pollTimer);
-    $("go").disabled = false;
-    showViewer(done.id, done.title);
-  }
-}
-function showViewer(id, title) {
-  const v = $("viewer");
-  v.style.display = "block";
-  v.src = "/p/" + id + "/";
-  $("openTab").href = "/p/" + id + "/";
-  $("openbar").style.display = "flex";
-  document.title = "卡片工坊 · " + title;
-  v.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-function stName(s) { return { queued: "排队中", running: "生成中…", done: "✅ 完成", error: "⚠ 出错" }[s] || s; }
-function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
-
-/* 编号自动建议: 生成时若留空由后端分配 */
-poll(); // 首屏拉一次任务列表
+syncTemplate();
+poll();
+startPoll();
 </script>
 </body>
 </html>
