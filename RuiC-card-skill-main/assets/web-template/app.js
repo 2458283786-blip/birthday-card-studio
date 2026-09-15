@@ -647,6 +647,7 @@ async function init() {
     camera,
     reset,
     flip,
+    setAuto,
     modelSource: config.assets.model,
     layers: reliefLayers,
     getState: () => ({ auto, flipped, finish, zoom }),
