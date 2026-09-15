@@ -12,6 +12,10 @@ _video-frames/
 mp-secret.json
 publish/
 
+# 小程序里的卡片素材(含真人照片)由 tools/build_mp_packages.py 生成, 不入库:
+#   python tools/build_mp_packages.py
+miniprogram/data/packages/
+
 # ---- Python / Node ----
 __pycache__/
 *.py[cod]

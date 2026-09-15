@@ -95,7 +95,20 @@ function claimCard(input) {
     wx.cloud.callFunction({
       name: cfg.claimFunction,
       data: { code: clean },
-      success: (res) => resolve((res && res.result) || { ok: false, error: 'FAILED' }),
+      success: (res) => {
+        const r = (res && res.result) || { ok: false, error: 'FAILED' };
+        // 云函数返回的是数据库里的记录; 这里和 mock 模式一样转成"视图",
+        // 保证两种后端的返回结构完全一致(否则页面换个字段就踩空)
+        if (r.ok && r.card) {
+          resolve({
+            ok: true,
+            alreadyMine: !!r.alreadyMine,
+            card: viewFromRecord({ card: r.card, assets: r.assets })
+          });
+          return;
+        }
+        resolve(r);
+      },
       fail: () => resolve({ ok: false, error: 'NETWORK' })
     });
   });

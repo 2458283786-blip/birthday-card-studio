@@ -121,6 +121,18 @@
   .toast.err{background:#7d2f22}
   .tplPreview{margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
   .tplPreview img{width:100%;display:block}
+  .swatches{display:flex;flex-wrap:wrap;gap:8px}
+  .sw{width:44px;height:44px;border-radius:9px;border:2px solid transparent;cursor:pointer;position:relative;
+      box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+  .sw.on{border-color:var(--clay);box-shadow:0 0 0 2px #fdf4ee}
+  .sw span{position:absolute;left:0;right:0;bottom:-16px;text-align:center;font-size:9px;color:var(--mut)}
+  .swatches{margin-bottom:18px}
+  .slider{display:grid;grid-template-columns:44px 1fr 40px;align-items:center;gap:8px;margin:6px 0}
+  .slider span{font-size:12px;color:var(--mut)}
+  .slider b{font-size:12px;color:var(--ink);text-align:right}
+  input[type=range]{-webkit-appearance:none;height:4px;background:var(--line);border-radius:2px;padding:0;border:0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+      background:var(--green);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2)}
   @media (max-width:1080px){
     .layout{grid-template-columns:1fr;height:auto;padding-bottom:80px}
     .stage{min-height:420px}
@@ -186,7 +198,45 @@
               <div class="chip" data-v="plain">素雅米白</div>
             </div>
           </div>
-          <div class="muted" style="margin-top:10px">底色 / 材质 / 景深面板下一步接入(能力已就绪, 写进配置即可生效)</div>
+          <div class="muted" style="margin-top:10px" id="advNeedCard">
+            底色 / 材质 / 景深 / 版面需要先选中一张已生成的卡(在下方历史记录里点开)
+          </div>
+
+          <div id="advPanel" style="display:none;margin-top:14px">
+            <label>卡牌底色 <span class="muted" id="baseNow"></span></label>
+            <div class="swatches" id="baseSwatches"></div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+              <button class="mini" id="aiColor">🎨 让 AI 选底色</button>
+              <button class="mini" id="applyBase">应用选中的底色</button>
+            </div>
+            <div class="muted" id="aiColorNote" style="margin-top:6px"></div>
+
+            <label style="margin-top:14px">材质预设(3D 下倾斜时可见)</label>
+            <div class="chips" id="matPresets">
+              <div class="chip on" data-v="current">经典珠光</div>
+              <div class="chip" data-v="B-gloss">哑光底+镜面</div>
+              <div class="chip" data-v="B-foil">哑光底+古铜烫金</div>
+              <div class="chip" data-v="A-foil">全底烫金箔</div>
+              <div class="chip" data-v="matte">全哑光印刷</div>
+            </div>
+
+            <label style="margin-top:14px">景深(层间视差强度)</label>
+            <div class="slider"><span>主体</span><input type="range" id="d_sub" min="0" max="0.8" step="0.02"><b id="v_sub"></b></div>
+            <div class="slider"><span>背景</span><input type="range" id="d_bg" min="-0.6" max="0" step="0.02"><b id="v_bg"></b></div>
+            <div class="slider"><span>前景</span><input type="range" id="d_fx" min="0" max="1.2" step="0.02"><b id="v_fx"></b></div>
+            <div class="slider"><span>文字</span><input type="range" id="d_tx" min="0" max="1" step="0.02"><b id="v_tx"></b></div>
+
+            <label style="margin-top:14px">版面比例(照片高度)</label>
+            <div class="chips" id="layoutPresets">
+              <div class="chip on" data-v="1290">标准(照片 74%)</div>
+              <div class="chip" data-v="1220">宽松(底栏更大)</div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn" id="applyAdv" style="height:34px;padding:0 16px;font-size:13px">应用到这张卡</button>
+              <span class="muted" id="advStatus"></span>
+            </div>
+          </div>
         </div>
       </details>
     </section>
@@ -473,6 +523,7 @@ function selectJob(j) {
   $("openTab").disabled = j.status !== "done";
   setSteps(1, j.staticReady ? 1 : 0, j.status === "done" ? 1 : 0);
   showView(j.id, viewMode);
+  loadAdv(j.id);                       // 进阶设置面板跟随当前卡
   $("histDrawer").classList.remove("open");
 }
 
@@ -589,8 +640,148 @@ async function saveEditor() {
 }
 $("editCancel").onclick = () => $("editDialog").close();
 $("editSave").onclick = saveEditor;
-$("aiBtn").onclick = () => toast("AI 辅助尚未接入工作台: 下一步接「语义判读 + 选色 + 版式建议」");
+$("aiBtn").onclick = () => {
+  if (!advId) { toast("先在历史记录里点开一张卡, 再用 AI 选底色"); return; }
+  const d = $("advPanel");
+  d.closest("details").open = true;
+  d.scrollIntoView({ behavior: "smooth", block: "center" });
+  loadPalette(true);
+};
 $("histBtnTop").onclick = () => $("histDrawer").classList.toggle("open");
+
+/* ---------------- 进阶设置面板 ---------------- */
+const MAT_PRESETS = {
+  current: { regions: { frame: "pearl", text: "matte", subject: "pearl", background: "pearl" },
+             amounts: { frame: .5, text: 0, subject: .35, background: .35 } },
+  "B-gloss": { regions: { frame: "gloss", text: "gloss", subject: "matte", background: "matte" },
+               amounts: { frame: .92, text: .72, subject: 0, background: 0 } },
+  "B-foil": { regions: { frame: "foil", text: "foil", subject: "matte", background: "matte" },
+              amounts: { frame: .95, text: .70, subject: 0, background: 0 } },
+  "A-foil": { regions: { frame: "foil", text: "foil", subject: "foil", background: "foil" },
+              amounts: { frame: .95, text: .75, subject: .45, background: .55 } },
+  matte: { regions: { frame: "matte", text: "matte", subject: "matte", background: "matte" },
+           amounts: { frame: 0, text: 0, subject: 0, background: 0 } },
+};
+let adv = { base: "", mat: "current", sub: .34, bg: -.30, fx: .62, tx: .55, photoBottom: 1290, picked: null, bgPage: "" };
+let advId = null;
+
+function matGuess(mat) {
+  const r = (mat && mat.regions) || {};
+  for (const k of Object.keys(MAT_PRESETS)) {
+    const p = MAT_PRESETS[k];
+    if (["frame", "text", "subject", "background"].every((f) => (r[f] || "matte") === (p.regions[f] || "matte"))) return k;
+  }
+  return "current";
+}
+function sliderSync() {
+  for (const [id, v] of [["d_sub", adv.sub], ["d_bg", adv.bg], ["d_fx", adv.fx], ["d_tx", adv.tx]]) {
+    const el = $(id);
+    if (el) { el.value = v; $("v_" + id.slice(2)).textContent = Number(v).toFixed(2); }
+  }
+}
+function chipPick(containerId, value) {
+  document.querySelectorAll("#" + containerId + " .chip").forEach((el) =>
+    el.classList.toggle("on", String(el.dataset.v) === String(value)));
+}
+["d_sub", "d_bg", "d_fx", "d_tx"].forEach((id) => {
+  const el = $(id);
+  if (!el) return;
+  el.oninput = () => {
+    const v = parseFloat(el.value);
+    if (id === "d_sub") adv.sub = v;
+    else if (id === "d_bg") adv.bg = v;
+    else if (id === "d_fx") adv.fx = v;
+    else adv.tx = v;
+    $("v_" + id.slice(2)).textContent = v.toFixed(2);
+  };
+});
+bindChips("matPresets", (v) => { adv.mat = v; });
+bindChips("layoutPresets", (v) => { adv.photoBottom = parseInt(v, 10); });
+
+async function loadAdv(id) {
+  advId = id;
+  $("advNeedCard").style.display = "none";
+  $("advPanel").style.display = "block";
+  try {
+    const c = await (await fetch("/api/config/" + id)).json();
+    adv.base = (c.appearance || {}).base || "";
+    adv.bgPage = (c.appearance || {}).background || "";
+    adv.mat = matGuess(c.material);
+    const p = c.parameters || {};
+    adv.sub = p.subjectDepth == null ? .34 : p.subjectDepth;
+    adv.bg = p.backgroundDepth == null ? -.30 : p.backgroundDepth;
+    adv.fx = p.effectsDepth == null ? .62 : p.effectsDepth;
+    adv.tx = p.textDepth == null ? .55 : p.textDepth;
+    adv.photoBottom = (c.layout || {}).photoBottom || 1290;
+    chipPick("matPresets", adv.mat);
+    chipPick("layoutPresets", adv.photoBottom);
+    sliderSync();
+    $("baseNow").textContent = adv.base ? "(当前 " + adv.base + ")" : "(未设置, 用模板默认)";
+    $("advStatus").textContent = "";
+  } catch (e) { toast("读取进阶配置失败", true); }
+}
+
+function renderSwatches() {
+  const box = $("baseSwatches");
+  if (!adv.picked || !adv.picked.length) {
+    box.innerHTML = '<span class="muted">点「让 AI 选底色」或「应用选中的底色」会列出照片里的候选色</span>';
+    return;
+  }
+  box.innerHTML = adv.picked.map((c) =>
+    '<div class="sw' + (c.hex === adv.base ? " on" : "") + '" data-hex="' + c.hex +
+    '" style="background:' + c.hex + '" title="' + esc(c.role) + " " + c.hex + '"><span>' + c.hex + "</span></div>").join("");
+  box.querySelectorAll(".sw").forEach((el) => el.onclick = () => {
+    adv.base = el.dataset.hex;
+    box.querySelectorAll(".sw").forEach((x) => x.classList.toggle("on", x.dataset.hex === adv.base));
+    $("advStatus").textContent = "已选中 " + adv.base + ", 点「应用到这张卡」生效";
+  });
+}
+
+async function loadPalette(useAi) {
+  if (!advId) { toast("先在历史记录里点开一张卡", true); return; }
+  $("aiColorNote").textContent = useAi ? "AI 正在看照片选色…(约 10~30 秒)" : "正在从照片提取候选色…";
+  try {
+    const r = await fetch("/api/palette", { method: "POST", headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ id: advId, ai: !!useAi }) });
+    const d = await r.json();
+    if (!d.ok) { $("aiColorNote").textContent = "取色失败: " + (d.error || r.status); return; }
+    adv.picked = d.candidates || [];
+    if (d.ai && d.ai.chosen_hex && !d.ai.error) {
+      adv.picked = [{ role: "AI 建议", hex: d.ai.chosen_hex, is_base: true }].concat(adv.picked);
+      $("aiColorNote").innerHTML = "<b>AI 选 " + d.ai.chosen_hex + "</b> —— " + esc(d.ai.why || "") +
+        (d.ai.reject ? "<br><span class='muted'>否决: " + esc(d.ai.reject) + "</span>" : "");
+      if (d.ai.surround_hex) { adv.bgPage = d.ai.surround_hex; }
+    } else if (d.ai && d.ai.error === "no_key") {
+      $("aiColorNote").textContent = "未配置 DEEPSEEK_API_KEY, 已用纯程序取色(候选依然可用)";
+    } else {
+      $("aiColorNote").textContent = "已提取 " + adv.picked.length + " 个候选色, 点色块选用";
+    }
+    renderSwatches();
+  } catch (e) { $("aiColorNote").textContent = "取色失败: " + e; }
+}
+
+async function applyAdvanced() {
+  if (!advId) { toast("先在历史记录里点开一张卡", true); return; }
+  const body = {
+    appearance: { base: adv.base || null, background: adv.bgPage || null },
+    material: MAT_PRESETS[adv.mat] || MAT_PRESETS.current,
+    parameters: { subjectDepth: adv.sub, backgroundDepth: adv.bg, effectsDepth: adv.fx, textDepth: adv.tx },
+    layout: { photoBottom: adv.photoBottom },
+  };
+  $("advStatus").textContent = "应用中…(重出图层约 3~6 秒)";
+  try {
+    const r = await fetch("/api/config/" + advId, { method: "POST", headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) { $("advStatus").textContent = "应用失败, 见日志"; toast("应用失败, 请看日志", true); return; }
+    $("advStatus").textContent = "已应用 ✓ 预览已刷新";
+    $("baseNow").textContent = adv.base ? "(当前 " + adv.base + ")" : "";
+    showView(advId, viewMode);
+  } catch (e) { $("advStatus").textContent = "应用失败: " + e; }
+}
+if ($("aiColor")) $("aiColor").onclick = () => loadPalette(true);
+if ($("applyBase")) $("applyBase").onclick = () => loadPalette(false);
+if ($("applyAdv")) $("applyAdv").onclick = applyAdvanced;
 
 syncTemplate();
 poll();

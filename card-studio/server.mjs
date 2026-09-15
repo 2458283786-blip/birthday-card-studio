@@ -295,6 +295,28 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(list));
     }
 
+    // ---- 取色助手: 从照片提取候选底色, 可选让 AI 选(进阶设置面板用) ----
+    if (req.method === "POST" && p === "/api/palette") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const id = String(raw.id || "");
+      const dir = path.join(PROJECTS, id);
+      if (!/^card-[a-z0-9]+$/.test(id) || !existsSync(dir)) { res.writeHead(404); return res.end("no card"); }
+      const logPath = path.join(dir, "palette.log");
+      const outFile = path.join(dir, "_palette.json");
+      try { await rm(logPath, { force: true }); } catch {}
+      try { await rm(outFile, { force: true }); } catch {}
+      const args = [process.env.PY || "python", "-u", path.join(__dir, "palette.py"), dir];
+      if (raw.ai) args.push("--ai");
+      const code = await runPy(args, ROOT, logPath, (l) => {
+        const job = jobs.get(id);
+        if (job) job.lines.push(l);
+      });
+      let data = null;
+      try { data = JSON.parse(await readFile(outFile, "utf8")); } catch {}
+      res.writeHead(code === 0 && data ? 200 : 500, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify(data || { ok: false, error: "取色失败, 见任务日志" }));
+    }
+
     // ---- 导出卡牌(Card Package + 单文件 Showcase) ----
     if (req.method === "POST" && p === "/api/export") {
       const raw = JSON.parse((await body(req)).toString("utf8"));
@@ -371,6 +393,11 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({
         id: cfgMatch[1], fields: pick,
         template: (cfg._provenance || {}).template || cfg.backStyle || "studio",
+        // 进阶设置面板需要当前值
+        appearance: cfg.appearance || {},
+        material: cfg.material || {},
+        parameters: cfg.parameters || {},
+        layout: cfg.layout || {},
       }));
     }
     if (cfgMatch && req.method === "POST") {

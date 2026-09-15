@@ -21,6 +21,21 @@
 │   ├── patch_birthday_viewer.py  # 查看器定制: 背板 / 四态 / 页面主题
 │   ├── refresh_birthday.py       # 改配置或换照片后一键刷新
 │   └── 启动卡片工坊.bat / 使用说明.md
+├── miniprogram/                  # 微信小程序: 我的收藏 + 卡牌详情(白底)
+│   ├── pages/collection/         # 收藏页: 只显示"已导入"的卡
+│   ├── pages/card/               # 卡牌页: 拖动 / 陀螺仪 / 翻面 / 太空漂浮
+│   ├── pages/import/             # 导入页: 手输 8 位一次性短码
+│   ├── components/holo-card/     # 卡牌本体: 分层视差 + WXS 手势
+│   ├── cloudfunctions/           # 云函数: claimCard(先到先得) / myCards
+│   └── config.js                 # mock(本地演示) / cloud(云开发) 一行切换
+├── tools/                        # 小程序相关的工具与自检
+│   ├── build_mp_packages.py      # Card Package → 小程序素材(WebP + 分层 + 索引)
+│   ├── publish_to_mp.py          # 工作台侧「发布到小程序」: 出一次性导入码
+│   ├── claim_code.py             # 短码生成与校验(Python 侧)
+│   ├── check_all.py              # 一键自检(语法/引用/数据层/云函数/体积)
+│   └── test_*.js                 # 数据层与云函数的可执行测试(用 Node 桩掉 wx)
+├── docs/小程序-云开发接入步骤.md   # 从注册 AppID 到发布的傻瓜操作单
+├── mockups/                      # 小程序页面设计示意图(4 张) + 生成脚本
 ├── birthday-set/                 # 五套模板成品(每套一个可独立打开的网页)
 ├── demo-koi/                     # 示例: 水墨锦鲤卡
 ├── demo-birthday/                # 示例: 深色生日卡
@@ -28,6 +43,22 @@
 ├── Birthday系列-设计方案.md        # 五套模板的视觉设计方案
 └── 卡片工坊-介绍.md                # 系统完整介绍
 ```
+
+## 小程序（我的收藏）
+
+客户在微信里打开小程序，输入一次性导入码，卡片就进他的收藏；一张卡一个码，先到先得，别人拿到同一个码也领不走。
+
+```bash
+python tools/build_mp_packages.py                  # 把 exports/ 的卡打包进小程序(素材会降采样成 WebP)
+python tools/publish_to_mp.py CARD-0001 --dry-run  # 本地发布: 出一个码, 立刻能在开发者工具里试
+python tools/publish_to_mp.py CARD-0001            # 真发布: 上传素材 + 写云数据库(需 mp-secret.json)
+python tools/publish_to_mp.py --list               # 看已发出的码 / 谁领了
+python tools/check_all.py                          # 改完代码跑这个: 自检 + 36 项测试
+```
+
+- 接入步骤（注册 AppID → 开通云开发 → 部署云函数 → 发布）：[`docs/小程序-云开发接入步骤.md`](docs/小程序-云开发接入步骤.md)
+- 页面设计示意图：[`mockups/`](mockups/)
+- 卡牌素材（含真人照片）由脚本生成、不入库；`mp-secret.json` 与 `publish/` 同样不入库。
 
 ## 快速开始
 

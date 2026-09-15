@@ -19,6 +19,28 @@ import qr_util  # noqa: E402
 
 EDITABLE = ["title", "subtitle", "tagline", "technique", "edition", "wish",
             "age", "name", "collection", "description", "qrUrl"]
+# 结构型改动(字典/数值), 由进阶设置面板提交
+STRUCT = ["appearance", "material", "parameters", "layout"]
+TEMPLATES = ("celebration", "soft", "pop", "night", "diorama")
+
+
+def merge_struct(cfg, edits):
+    """合并 appearance / material / parameters / layout(浅合并, 只覆盖给出的键)。"""
+    changed = []
+    for key in STRUCT:
+        if key not in edits or not isinstance(edits[key], dict):
+            continue
+        cur = cfg.get(key)
+        if not isinstance(cur, dict):
+            cur = {}
+        for k, v in edits[key].items():
+            if isinstance(v, dict) and isinstance(cur.get(k), dict):
+                cur[k] = {**cur[k], **v}
+            else:
+                cur[k] = v
+            changed.append(f"{key}.{k}")
+        cfg[key] = cur
+    return changed
 
 
 def find_image(project):
@@ -35,7 +57,7 @@ def main():
     cfg_path = project / "card-config.json"
     cfg = json.loads(cfg_path.read_text(encoding="utf8"))
 
-    changed = []
+    changed = merge_struct(cfg, edits)
     for k in EDITABLE:
         if k in edits:
             v = str(edits[k] or "").strip()
@@ -49,6 +71,21 @@ def main():
         else:
             cfg.pop("qr", None)
     cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf8")
+
+    # 同步到 web 副本(查看器读这份): 逐键合并, 保留 assets 等流水线写入的字段
+    web_cfg = project / "web" / "card-config.json"
+    if web_cfg.parent.exists() and web_cfg.exists():
+        try:
+            web = json.loads(web_cfg.read_text(encoding="utf8"))
+            for k in ("title", "subtitle", "tagline", "technique", "edition", "wish", "age", "name",
+                      "collection", "description", "qrUrl", "qr", "appearance", "material",
+                      "parameters", "layout", "backStyle"):
+                if k in cfg:
+                    web[k] = cfg[k]
+            web_cfg.write_text(json.dumps(web, ensure_ascii=False, indent=2), encoding="utf8")
+            print("[编辑] 已同步 web/card-config.json(3D 预览会跟着变)")
+        except Exception as e:
+            print(f"[警告] web 副本未同步: {type(e).__name__}")
 
     # 同步回 meta.json(便于以后整张重生成)
     meta_path = project / "meta.json"

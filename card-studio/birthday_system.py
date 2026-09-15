@@ -824,6 +824,14 @@ def main():
 
     ImageOps.exif_transpose(Image.open(photo)).convert("RGB").save(out / "source.png")
     box, kind = photo_box(tpl)
+    lay = cfg.get("layout") or {}                  # 进阶设置: 版面比例微调(Night)
+    if tpl == "night" and lay.get("photoBottom"):
+        try:
+            pb = int(max(700, min(1300, int(lay["photoBottom"]))))   # 不越过底栏分隔线(1318)
+            box = (box[0], box[1], box[2], pb)
+            log(f"版面覆盖: 照片底 {pb}")
+        except Exception:
+            pass
     photo_layer(photo, tpl, box, kind).save(out / "subject.png")
     background(tpl).save(out / "background.png")
     lineart(tpl).save(out / "lineart.png")
