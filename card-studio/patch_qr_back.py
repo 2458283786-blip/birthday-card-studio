@@ -14,7 +14,7 @@ QR_JS = """  // 二维码(§11 有就展示): 只按 config.qr.matrix 绘制, �
   const qrCfg = config.qr || (config.qrUrl ? { enabled: true, url: config.qrUrl } : null);
   if (qrCfg && qrCfg.enabled && Array.isArray(qrCfg.matrix) && qrCfg.matrix.length) {
     const qn = qrCfg.matrix.length;
-    const qbox = 132, qpad = 12;
+    const qbox = 118, qpad = 10;
     const qx = 1024 - 92 - qbox, qy = 1536 - 92 - qbox;
     ctx.save();
     ctx.fillStyle = dark ? "rgba(250,247,240,.94)" : "rgba(255,253,249,.96)";

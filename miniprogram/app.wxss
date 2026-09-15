@@ -45,71 +45,49 @@ page {
   align-items: center;
 }
 
-/* 顶栏细线图标 */
+/* 顶栏细线图标: 内联 SVG, 不依赖字体也不受 button 默认样式干扰 */
 .ico {
   width: 64rpx;
   height: 64rpx;
   border-radius: 22rpx;
   border: 1rpx solid var(--hair);
-  background: #ffffff;
-  position: relative;
+  background-color: #ffffff;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 34rpx 34rpx;
   box-sizing: border-box;
 }
 
-.ico + .ico {
+.ico + .ico,
+.ico.share {
   margin-left: 16rpx;
 }
 
-.ico::after,
-.ico::before {
-  content: "";
-  position: absolute;
-  background: #3a3e48;
+.ico.back {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a3e48' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 18l-6-6 6-6'/%3E%3C/svg%3E");
 }
 
-.ico.back::before {
-  width: 18rpx;
-  height: 2rpx;
-  left: 22rpx;
-  top: 30rpx;
-  transform: rotate(-45deg);
-  transform-origin: left center;
-  box-shadow: 0 18rpx 0 0 #3a3e48;
-}
-
-.ico.back::after {
-  width: 2rpx;
-  height: 26rpx;
-  left: 20rpx;
-  top: 19rpx;
-}
-
-.ico.save::before {
-  width: 2rpx;
-  height: 20rpx;
-  left: 31rpx;
-  top: 20rpx;
-}
-
-.ico.save::after {
-  width: 22rpx;
-  height: 2rpx;
-  left: 21rpx;
-  top: 46rpx;
-  box-shadow: none;
+.ico.save {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a3e48' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3Cpath d='M12 15V3'/%3E%3C/svg%3E");
 }
 
 .ico.share {
-  padding: 0;
-  margin: 0 0 0 16rpx;
-  line-height: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a3e48' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='18' cy='5' r='3'/%3E%3Ccircle cx='6' cy='12' r='3'/%3E%3Ccircle cx='18' cy='19' r='3'/%3E%3Cpath d='M8.6 13.5l6.8 4M15.4 6.5l-6.8 4'/%3E%3C/svg%3E");
 }
 
-.ico.share::before {
-  width: 4rpx;
-  height: 4rpx;
-  border-radius: 50%;
-  left: 20rpx;
-  top: 22rpx;
-  box-shadow: 20rpx 8rpx 0 0 #3a3e48, 20rpx -8rpx 0 0 #3a3e48;
+/* 分享必须是 button(open-type="share"), 这里剥掉它的默认外观 */
+.share-btn {
+  padding: 0;
+  margin: 0 0 0 16rpx;
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.share-btn::after {
+  border: none;
+  display: none;
 }

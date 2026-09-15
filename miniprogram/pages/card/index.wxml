@@ -1,0 +1,42 @@
+<!-- 卡牌页: 白底 · 卡片铺满 · 拖动/陀螺仪/翻面 · 下方保留卡牌字段 -->
+<view class="page" style="background:{{bg}}">
+  <view style="height:{{statusBar}}px"></view>
+
+  <view class="bar-in">
+    <view class="ico back" bindtap="goBack"></view>
+    <view class="bar-right">
+      <view class="ico save" bindtap="onSave"></view>
+      <button class="share-btn" open-type="share">
+        <view class="ico share"></view>
+      </button>
+    </view>
+  </view>
+
+  <block wx:if="{{card}}">
+    <view class="stage-wrap">
+      <view class="enter {{ready ? 'in' : ''}}" style="{{enterStyle}}">
+        <holo-card card="{{card}}" />
+      </view>
+    </view>
+
+    <view class="meta {{ready ? 'in' : ''}}">
+      <view class="latin m-id">{{card.displayId}}<text class="sep">·</text>{{card.dateText}}</view>
+      <view class="m-note" wx:for="{{card.notes}}" wx:key="*this">{{item}}</view>
+      <view class="m-owner" wx:for="{{card.owners}}" wx:key="label">
+        <text class="latin label">{{item.label}}</text>
+        <text class="value">{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="hint {{hintOff ? 'off' : ''}}">拖动旋转 · 点击翻面</view>
+  </block>
+
+  <!-- 找不到这张卡: 显示一句提示, 不报错也不白屏 -->
+  <view class="missing" wx:else>
+    <view class="missing-t">这张卡不在这里</view>
+    <view class="missing-s" wx:if="{{missing}}">它可能还没做好，或者链接不对</view>
+  </view>
+
+  <!-- 保存用画布(不在屏幕上显示) -->
+  <canvas type="2d" id="export" class="export-canvas"></canvas>
+</view>

@@ -266,6 +266,20 @@ function backTexture() {
     let x = cx - w / 2;
     for (const ch of chars) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + tracking; }
   };
+  const fitText = (text, weight, fam, size, maxW, tracking, minSize) => {
+    let t = String(text == null ? "" : text), sz = size;
+    const fontOf = (px) => (weight ? weight + " " : "") + px + "px " + fam;
+    const wid = (str, px) => {
+      ctx.font = fontOf(px);
+      const n = [...str].length;
+      return ctx.measureText(str).width + tracking * Math.max(0, n - 1);
+    };
+    while (sz > (minSize || 12) && wid(t, sz) > maxW) sz -= 1;
+    const full = t;
+    while (t.length > 3 && wid(t + "\u2026", sz) > maxW) t = t.slice(0, -1);
+    return { font: fontOf(sz), text: t === full ? t : t + "\u2026" };
+  };
+
   const field = (label, y, value) => {          // 没数据 → 完全不显示(不留占位线)
     if (!value) return;
     tracked(label, 512, y, "12px 'Segoe UI', Arial", 3.2, "rgba(" + (S.frame === "bold" ? "20,20,20,.62" : "139,132,116,.92") + ")");
@@ -324,10 +338,7 @@ function backTexture() {
     ctx.font = (config.backStyle === "pop" ? "300px Bahnschrift, Arial Black" : "320px Palatino Linotype, Georgia, serif");
     ctx.textAlign = "center"; ctx.fillText(age, 512, 880); ctx.textAlign = "left";
   }
-  tracked(config.title || "", 512, 900,
-          (config.backStyle === "pop" ? "800 86px Bahnschrift, Arial Black"
-            : config.backStyle === "celebration" ? "84px Palatino Linotype, Georgia, serif"
-            : "92px Palatino Linotype, Georgia, serif"), 2, inkC);
+  // 背面不放标题(标题属于正面)
   star(512, 940, 5, (dark ? "222,201,160,.8" : "58,52,44,.5"));
   ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.40" : "58,52,44,.30") + ")";
   ctx.lineWidth = 1;
@@ -337,70 +348,29 @@ function backTexture() {
   // 收藏凭证区
   ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.28" : "58,52,44,.22") + ")";
   ctx.beginPath(); ctx.moveTo(372, 1104); ctx.lineTo(652, 1104); ctx.stroke();
-  if (config.name) tracked("FOR " + String(config.name).toUpperCase(), 512, 1150, "16px 'Segoe UI', Arial", 4, inkC);
-  if (config.technique) tracked(config.technique, 512, 1206, "22px 'Segoe UI', Arial", 2, goldC);
-  if (config.wish) tracked(config.wish, 512, 1258, "italic 21px Palatino Linotype, Georgia, serif", 0.6,
-                           "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")");
-  field("CREATED BY", 1330, config.createdBy || "");
-  field("OWNED BY", 1396, config.ownedBy || "");
-  // 二维码(§11 有就展示): 只按 config.qr.matrix 绘制, 无外部依赖
-  const qrCfg = config.qr || (config.qrUrl ? { enabled: true, url: config.qrUrl } : null);
-  if (qrCfg && qrCfg.enabled && Array.isArray(qrCfg.matrix) && qrCfg.matrix.length) {
-    const qn = qrCfg.matrix.length;
-    const qbox = 132, qpad = 12;
-    const qx = 1024 - 92 - qbox, qy = 1536 - 92 - qbox;
-    ctx.save();
-    ctx.fillStyle = dark ? "rgba(250,247,240,.94)" : "rgba(255,253,249,.96)";
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(qx - qpad, qy - qpad, qbox + qpad * 2, qbox + qpad * 2, 12);
-    else ctx.rect(qx - qpad, qy - qpad, qbox + qpad * 2, qbox + qpad * 2);
-    ctx.fill();
-    const qcell = qbox / qn;
-    ctx.fillStyle = dark ? "#0d111c" : "#241f19";
-    for (let r = 0; r < qn; r++) {
-      const rowStr = String(qrCfg.matrix[r]);
-      for (let c = 0; c < qn; c++) {
-        if (rowStr.charAt(c) === "1") {
-          ctx.fillRect(qx + c * qcell, qy + r * qcell, Math.ceil(qcell), Math.ceil(qcell));
-        }
-      }
-    }
-    ctx.restore();
-    tracked("SCAN", 1024 - 92 - qbox / 2, qy + qbox + qpad + 24, "12px 'Segoe UI', Arial", 3,
-            "rgba(" + (dark ? "222,201,160,.72" : "58,52,44,.58") + ")");
+  const hasQr = !!(config.qr && config.qr.enabled && Array.isArray(config.qr.matrix));
+  const safeW = hasQr ? 560 : 780;
+  if (config.name) {
+    const t = fitText(String(config.name).toUpperCase(), "600", "'Segoe UI', 'Microsoft YaHei', Arial", 17, safeW, 3.4, 12);
+    tracked(t.text, 512, 1148, t.font, 3.4, inkC);
+  }
+  if (config.technique) {
+    const t = fitText(config.technique, "", "'Segoe UI', 'Microsoft YaHei', Arial", 23, safeW, 2, 12);
+    tracked(t.text, 512, 1204, t.font, 2, goldC);
+  }
+  if (config.wish) {
+    const t = fitText(config.wish, "", "'Palatino Linotype', 'Microsoft YaHei', Georgia, serif", 21, safeW, 0.6, 12);
+    tracked(t.text, 512, 1256, t.font, 0.6, "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")");
+  }
+  const meta2 = [];
+  if (config.createdBy) meta2.push("CREATED BY " + String(config.createdBy).toUpperCase());
+  if (config.ownedBy) meta2.push("OWNED BY " + String(config.ownedBy).toUpperCase());
+  if (meta2.length) {
+    const t = fitText(meta2.join("  \u00b7  "), "", "'Segoe UI', 'Microsoft YaHei', Arial", 13, safeW, 2.6, 11);
+    tracked(t.text, 512, 1320, t.font, 2.6, "rgba(" + (dark ? "222,201,160,.62" : "58,52,44,.62") + ")");
   }
   return canvasTexture(c);
-}function addShadow() {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 256;
-  const ctx = c.getContext("2d");
-  const grad = ctx.createRadialGradient(128, 128, 6, 128, 128, 128);
-  grad.addColorStop(0, "rgba(29,35,25,0.13)");
-  grad.addColorStop(0.4, "rgba(29,35,25,0.055)");
-  grad.addColorStop(1, "rgba(29,35,25,0)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 256, 256);
-  shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(8.8, 11.8),
-    new THREE.MeshBasicMaterial({
-      map: canvasTexture(c),
-      transparent: true,
-      depthWrite: false,
-    }),
-  );
-  shadow.position.set(0.28, -0.48, -0.5);
-  scene.add(shadow);
-}
-// Render a lucide node tree (["svg", attrs, [children]]) into an svg element.
-function renderIconNode(node) {
-  const [tag, attrs = {}, children = []] = node;
-  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
-  for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
-  for (const child of children) el.appendChild(renderIconNode(child));
-  return el;
-}
-function refreshIcons() {
+}function refreshIcons() {
   const overrides = { "stroke-width": 1.5 };
   document.querySelectorAll("[data-lucide]").forEach((el) => {
     const name = el.getAttribute("data-lucide");

@@ -1,0 +1,8 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#ffffff",
+  "disableScroll": true,
+  "usingComponents": {
+    "holo-card": "/components/holo-card/index"
+  }
+}

@@ -1,0 +1,38 @@
+<wxs module="holo" src="./holo.wxs" />
+
+<view
+  class="stage"
+  bindtouchstart="{{holo.touchStart}}"
+  bindtouchmove="{{holo.touchMove}}"
+  bindtouchend="{{holo.touchEnd}}"
+  bindtouchcancel="{{holo.touchEnd}}"
+>
+  <!-- float: 静置时轻微浮动(CSS 动画) · motion: 陀螺仪(逻辑层) · flip: 翻面 · card3d: 手指拖动(WXS) -->
+  <view class="floater {{floatOn ? 'on' : ''}}">
+    <view class="motion" style="{{motionStyle}}">
+      <view class="flipper {{flipped ? 'flipped' : ''}}">
+        <view class="card3d">
+
+          <view class="face face-front">
+            <block wx:if="{{!useFlat}}">
+              <image
+                wx:for="{{layers}}"
+                wx:key="name"
+                class="layer"
+                src="{{item.src}}"
+                mode="aspectFill"
+                style="transform: translateZ({{item.z}}rpx)"
+              />
+            </block>
+            <image wx:else class="layer" src="{{flat}}" mode="aspectFill" />
+          </view>
+
+          <view class="face face-back" wx:if="{{hasBack}}">
+            <image class="layer" src="{{back}}" mode="aspectFill" />
+          </view>
+
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

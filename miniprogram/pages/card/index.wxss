@@ -1,0 +1,101 @@
+.page {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* 卡片: 屏宽 - 左右各 24px, 比例 2:3 */
+.stage-wrap {
+  padding: 8px 24px 0;
+}
+
+.enter {
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 240ms ease;
+  opacity: 0;
+  will-change: transform;
+}
+
+.enter.in {
+  opacity: 1;
+}
+
+/* 卡片下方的字段: 生成这张卡时真填了的内容 */
+.meta {
+  padding: 40rpx 48rpx 0;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 320ms ease 180ms;
+}
+
+.meta.in {
+  opacity: 1;
+}
+
+.m-id {
+  font-size: 22rpx;
+  color: var(--ink);
+}
+
+.m-id .sep {
+  margin: 0 14rpx;
+  color: var(--ink-faint);
+}
+
+.m-note {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+}
+
+.m-owner {
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  color: var(--ink-muted);
+}
+
+.m-owner .label {
+  font-size: 18rpx;
+  color: var(--ink-faint);
+  margin-right: 12rpx;
+}
+
+/* 首次进入的提示: 几秒后自动淡出 */
+.hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 40rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--ink-faint);
+  transition: opacity 600ms ease;
+}
+
+.hint.off {
+  opacity: 0;
+}
+
+/* 空态 */
+.missing {
+  padding-top: 320rpx;
+  text-align: center;
+}
+
+.missing-t {
+  font-size: 30rpx;
+  color: var(--ink-faint);
+}
+
+.missing-s {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: var(--ink-faint);
+}
+
+.export-canvas {
+  position: fixed;
+  left: -2000px;
+  top: 0;
+  width: 1080px;
+  height: 1620px;
+}

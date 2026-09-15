@@ -149,6 +149,20 @@ BACK_JS = r'''function backTexture() {
     let x = cx - w / 2;
     for (const ch of chars) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + tracking; }
   };
+  const fitText = (text, weight, fam, size, maxW, tracking, minSize) => {
+    let t = String(text == null ? "" : text), sz = size;
+    const fontOf = (px) => (weight ? weight + " " : "") + px + "px " + fam;
+    const wid = (str, px) => {
+      ctx.font = fontOf(px);
+      const n = [...str].length;
+      return ctx.measureText(str).width + tracking * Math.max(0, n - 1);
+    };
+    while (sz > (minSize || 12) && wid(t, sz) > maxW) sz -= 1;
+    const full = t;
+    while (t.length > 3 && wid(t + "\u2026", sz) > maxW) t = t.slice(0, -1);
+    return { font: fontOf(sz), text: t === full ? t : t + "\u2026" };
+  };
+
   const field = (label, y, value) => {          // 没数据 → 完全不显示(不留占位线)
     if (!value) return;
     tracked(label, 512, y, "12px 'Segoe UI', Arial", 3.2, "rgba(" + (S.frame === "bold" ? "20,20,20,.62" : "139,132,116,.92") + ")");
@@ -207,10 +221,7 @@ BACK_JS = r'''function backTexture() {
     ctx.font = (config.backStyle === "pop" ? "300px Bahnschrift, Arial Black" : "320px Palatino Linotype, Georgia, serif");
     ctx.textAlign = "center"; ctx.fillText(age, 512, 880); ctx.textAlign = "left";
   }
-  tracked(config.title || "", 512, 900,
-          (config.backStyle === "pop" ? "800 86px Bahnschrift, Arial Black"
-            : config.backStyle === "celebration" ? "84px Palatino Linotype, Georgia, serif"
-            : "92px Palatino Linotype, Georgia, serif"), 2, inkC);
+  // 背面不放标题(标题属于正面)
   star(512, 940, 5, (dark ? "222,201,160,.8" : "58,52,44,.5"));
   ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.40" : "58,52,44,.30") + ")";
   ctx.lineWidth = 1;
@@ -220,12 +231,27 @@ BACK_JS = r'''function backTexture() {
   // 收藏凭证区
   ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.28" : "58,52,44,.22") + ")";
   ctx.beginPath(); ctx.moveTo(372, 1104); ctx.lineTo(652, 1104); ctx.stroke();
-  if (config.name) tracked("FOR " + String(config.name).toUpperCase(), 512, 1150, "16px 'Segoe UI', Arial", 4, inkC);
-  if (config.technique) tracked(config.technique, 512, 1206, "22px 'Segoe UI', Arial", 2, goldC);
-  if (config.wish) tracked(config.wish, 512, 1258, "italic 21px Palatino Linotype, Georgia, serif", 0.6,
-                           "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")");
-  field("CREATED BY", 1330, config.createdBy || "");
-  field("OWNED BY", 1396, config.ownedBy || "");
+  const hasQr = !!(config.qr && config.qr.enabled && Array.isArray(config.qr.matrix));
+  const safeW = hasQr ? 560 : 780;
+  if (config.name) {
+    const t = fitText(String(config.name).toUpperCase(), "600", "'Segoe UI', 'Microsoft YaHei', Arial", 17, safeW, 3.4, 12);
+    tracked(t.text, 512, 1148, t.font, 3.4, inkC);
+  }
+  if (config.technique) {
+    const t = fitText(config.technique, "", "'Segoe UI', 'Microsoft YaHei', Arial", 23, safeW, 2, 12);
+    tracked(t.text, 512, 1204, t.font, 2, goldC);
+  }
+  if (config.wish) {
+    const t = fitText(config.wish, "", "'Palatino Linotype', 'Microsoft YaHei', Georgia, serif", 21, safeW, 0.6, 12);
+    tracked(t.text, 512, 1256, t.font, 0.6, "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")");
+  }
+  const meta2 = [];
+  if (config.createdBy) meta2.push("CREATED BY " + String(config.createdBy).toUpperCase());
+  if (config.ownedBy) meta2.push("OWNED BY " + String(config.ownedBy).toUpperCase());
+  if (meta2.length) {
+    const t = fitText(meta2.join("  \u00b7  "), "", "'Segoe UI', 'Microsoft YaHei', Arial", 13, safeW, 2.6, 11);
+    tracked(t.text, 512, 1320, t.font, 2.6, "rgba(" + (dark ? "222,201,160,.62" : "58,52,44,.62") + ")");
+  }
   return canvasTexture(c);
 }
 '''

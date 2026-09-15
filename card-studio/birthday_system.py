@@ -649,7 +649,7 @@ def text_layer(tpl, cfg):
         tracked(d, (W / 2, 122), HB, fnt(HB, 31, "sansb"), (255, 255, 255, 246), 11.5, True,
                 shadow=(1, 2, (40, 34, 28, 120)))
         if NAME:
-            tracked(d, (W / 2, 172), f"FOR {str(NAME).upper()}", fnt(NAME, 20), (255, 255, 255, 220), 5.0, True,
+            tracked(d, (W / 2, 172), f"{str(NAME).upper()}", fnt(NAME, 20), (255, 255, 255, 220), 5.0, True,
                     shadow=(1, 1, (40, 34, 28, 110)))
         if AGE:
             f = font(SANS_BLACK, 232)
@@ -680,7 +680,7 @@ def text_layer(tpl, cfg):
         tracked(d, (W / 2, 148), HB, fnt(HB, 28), (255, 253, 250, 245), 10.0, True,
                 shadow=(1, 1, (90, 80, 70, 110)))
         if NAME:
-            tracked(d, (W / 2, 190), f"FOR {str(NAME).upper()}", fnt(NAME, 18), (255, 253, 250, 225), 4.5, True,
+            tracked(d, (W / 2, 190), f"{str(NAME).upper()}", fnt(NAME, 18), (255, 253, 250, 225), 4.5, True,
                     shadow=(1, 1, (90, 80, 70, 100)))
         cx, cy, r = 178, 1252, 76
         d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=p["gold"] + (190,), width=1)
@@ -713,7 +713,7 @@ def text_layer(tpl, cfg):
         elif YEAR:
             tracked(d, (76, 1240), YEAR, font(SANS_BLACK, 116), p["ink"] + (255,), 2.0)
         if NAME:
-            tracked(d, (84, 1352), f"FOR {str(NAME).upper()}", fnt(NAME, 24, "sansb"), p["ink"] + (235,), 3.0)
+            tracked(d, (84, 1352), f"{str(NAME).upper()}", fnt(NAME, 24, "sansb"), p["ink"] + (235,), 3.0)
         xr = W - 80
         pill_w = tw(d, NO, fnt(NO, 22, "sansb"), 1.2) + 44
         d.rounded_rectangle([xr - pill_w, 1412, xr, 1456], radius=22, fill=p["ink"] + (255,))
@@ -735,7 +735,7 @@ def text_layer(tpl, cfg):
         d.line([(W / 2 - 152, 184), (W / 2 - 32, 184)], fill=p["gold"] + (130,), width=1)
         d.line([(W / 2 + 32, 184), (W / 2 + 152, 184)], fill=p["gold"] + (130,), width=1)
         if NAME:
-            tracked(d, (W / 2, 216), f"FOR {str(NAME).upper()}", fnt(NAME, 18), p["gold"] + (195,), 5.0, True)
+            tracked(d, (W / 2, 216), f"{str(NAME).upper()}", fnt(NAME, 18), p["gold"] + (195,), 5.0, True)
         y = 1210
         for i in range(816):
             al = int(min(1.0, min(i, 815 - i) / 60.0) * 62)
@@ -769,7 +769,7 @@ def text_layer(tpl, cfg):
         # —— 上方标题带 —— (名字优先, 没填名字就用卡名, 保证输入的卡名不会消失)
         HDR = NAME or TITLE
         if HDR:
-            tracked(d, (W / 2, 62), f"FOR {HDR.upper()}", fnt(HDR, 18, "sansb"),
+            tracked(d, (W / 2, 62), f"{HDR.upper()}", fnt(HDR, 18, "sansb"),
                     p["gold"] + (180,), 5.0, True)
         if HB:
             tracked(d, (W / 2, 104), HB, fnt(HB, 31, "sansb"), (236, 222, 188, 242), 11.0, True)

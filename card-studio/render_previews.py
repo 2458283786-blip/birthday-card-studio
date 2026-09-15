@@ -317,23 +317,23 @@ def render_back(tpl, cfg):
     has_qr = bool(qr_cfg.get("enabled") and qr_cfg.get("matrix"))
     text_w = 560 if has_qr else SAFE_W       # 有二维码时收窄正文, 避免相撞
 
-    def fit(text, fam2, size, max_w, tracking=0.0, min_size=13):
-        """字号自适应: 先缩字号, 仍放不下再截断加省略号。"""
+    def fit(text, kind, size, max_w, tracking=0.0, min_size=13):
+        """字号自适应 + 按内容切中文字体(ftext), 仍放不下就截断。"""
         t = str(text)
         s = size
         while s > min_size:
-            fnt = f(fam2, s)
+            fnt = ftext(t, s, kind)
             if d.textlength(t, font=fnt) + tracking * max(0, len(t) - 1) <= max_w:
                 return fnt, t
             s -= 1
-        fnt = f(fam2, min_size)
+        fnt = ftext(t, min_size, kind)
         while len(t) > 3 and d.textlength(t + "…", font=fnt) + tracking * len(t) > max_w:
             t = t[:-1]
         return fnt, (t + "…" if t != str(text) else t)
 
     # ① 身份: CARD #
     if cfg.get("edition"):
-        fnt, t = fit(cfg["edition"], SANS, 20, 520, 2.4)
+        fnt, t = fit(cfg["edition"], "sans", 20, 520, 2.4)
         tracked(d, (512, 312), t, fnt, gold, 2.4, True)
     d.line([(432, 348), (592, 348)], fill=S["ink"] + (80,), width=1)
 
@@ -348,9 +348,7 @@ def render_back(tpl, cfg):
                                 fill=col, anchor="ms")
         im.alpha_composite(wm)
     d = ImageDraw.Draw(im)
-    if cfg.get("title"):
-        fnt, t = fit(cfg["title"], fam, 86 if style == "pop" else 92, SAFE_W, 2)
-        tracked(d, (512, 900), t, fnt, ink, 2, True)
+    # 背面不放标题(标题属于正面; 且卡名可能是文件名字符串)
     _star(d, 512, 940, 5, S["ink"] + (140,))
     d.line([(392, 940), (486, 940)], fill=S["ink"] + (70,), width=1)
     d.line([(538, 940), (632, 940)], fill=S["ink"] + (70,), width=1)
@@ -358,18 +356,18 @@ def render_back(tpl, cfg):
     # ③ 凭证区(只保留 4 行以内): 名字 / 日期 / 祝福 / 归属(合并一行)
     d.line([(372, 1104), (652, 1104)], fill=S["ink"] + (60,), width=1)
     if cfg.get("name"):
-        fnt, t = fit("FOR " + str(cfg["name"]).upper(), SANS_SB, 17, text_w, 3.4)
+        fnt, t = fit(str(cfg["name"]).upper(), "sansb", 17, text_w, 3.4)
         tracked(d, (512, 1148), t, fnt, ink, 3.4, True)
     if cfg.get("technique"):
-        fnt, t = fit(cfg["technique"], SANS, 23, text_w, 2.0)
+        fnt, t = fit(cfg["technique"], "sans", 23, text_w, 2.0)
         tracked(d, (512, 1204), t, fnt, gold, 2.0, True)
     if cfg.get("wish"):
-        fnt, t = fit(cfg["wish"], SERIF, 21, text_w, 0.6)
+        fnt, t = fit(cfg["wish"], "serif", 21, text_w, 0.6)
         tracked(d, (512, 1256), t, fnt, S["ink"] + (190,), 0.6, True)
     owners = " · ".join(x for x in [("CREATED BY " + str(cfg["createdBy"]).upper()) if cfg.get("createdBy") else "",
                                     ("OWNED BY " + str(cfg["ownedBy"]).upper()) if cfg.get("ownedBy") else ""] if x)
     if owners:
-        fnt, t = fit(owners, SANS, 13, text_w, 2.6)
+        fnt, t = fit(owners, "sans", 13, text_w, 2.6)
         tracked(d, (512, 1320), t, fnt, S["ink"] + (150,), 2.6, True)
 
     # ④ 二维码(可选): 低右角, 与正文互不重叠

@@ -1,0 +1,72 @@
+/* 卡牌手势: 用 WXS 直接改样式, 不走 setData —— 这样拖动才是"跟手"的
+ * 逻辑层只负责"点击翻面"这一个动作(WXS 通过 callMethod 通知)。
+ * 事件里没有任何参数传递, 状态就存在这个模块里, 每个页面一份。
+ */
+var x = 0;        // 当前 rotateY
+var y = 0;        // 当前 rotateX
+var bx = 0;
+var by = 0;
+var sx = 0;
+var sy = 0;
+var dragging = false;
+var moved = 0;
+
+function clamp(v, a, b) {
+  if (v < a) return a;
+  if (v > b) return b;
+  return v;
+}
+
+function apply(ins) {
+  var card = ins.selectComponent('.card3d');
+  if (!card) return;
+  card.setStyle({
+    transform: 'rotateX(' + y.toFixed(2) + 'deg) rotateY(' + x.toFixed(2) + 'deg)'
+  });
+}
+
+function touchStart(e, ins) {
+  var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+  if (!t) return;
+  sx = t.pageX;
+  sy = t.pageY;
+  bx = x;
+  by = y;
+  dragging = true;
+  moved = 0;
+  var card = ins.selectComponent('.card3d');
+  if (card) card.removeClass('easing');
+}
+
+function touchMove(e, ins) {
+  if (!dragging) return;
+  var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+  if (!t) return;
+  var dx = t.pageX - sx;
+  var dy = t.pageY - sy;
+  var dist = Math.abs(dx) + Math.abs(dy);
+  if (dist > moved) moved = dist;
+  x = clamp(bx + dx * 0.38, -30, 30);
+  y = clamp(by - dy * 0.30, -24, 24);
+  apply(ins);
+}
+
+function touchEnd(e, ins) {
+  if (!dragging) return;
+  dragging = false;
+  var card = ins.selectComponent('.card3d');
+  if (card) card.addClass('easing');
+  if (moved < 10) {
+    // 几乎没移动 → 当成"点了一下"
+    ins.callMethod('onCardTap');
+  }
+  x = 0;
+  y = 0;
+  apply(ins);
+}
+
+module.exports = {
+  touchStart: touchStart,
+  touchMove: touchMove,
+  touchEnd: touchEnd
+};
