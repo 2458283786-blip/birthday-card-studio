@@ -1,6 +1,7 @@
-/* 卡牌: 一叠有前后距离的层 + 拖动/陀螺仪/翻面
- * 包装层各管一件事, 互不打架:
- *   .floater 静置浮动(动画) · .motion 陀螺仪(setData) · .flipper 翻面(class) · .card3d 拖动(WXS)
+/* 卡牌: 整张成品图 + 浮动/陀螺仪/翻面/拖动
+ * 四层包装各管一件事, 互不打架:
+ *   .floater 静置浮动(动画) · .motion 陀螺仪(setData) · .flipper 翻面(JS) · .card3d 拖动(WXS)
+ * 第一版不拆分层: 拆层会被透视缩放, 画面就和工坊生成的成品卡不一致。
  */
 .stage {
   position: relative;
@@ -13,13 +14,14 @@
 .floater,
 .motion,
 .flipper,
-.card3d,
-.face {
+.card3d {
   position: absolute;
   left: 0;
   top: 0;
   right: 0;
   bottom: 0;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
 }
 
 .floater.on {
@@ -32,48 +34,15 @@
   100% { transform: translate3d(0, 0, 0) rotate(-0.3deg); }
 }
 
+/* 翻面的过渡写在 JS 的 flipStyle 里(要分两段), 这里不设 transition */
 .motion {
   transition: transform 220ms ease-out;
 }
 
-.flipper {
-  transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
-  transition: transform 560ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.flipper.flipped {
-  transform: rotateY(180deg);
-}
-
-.card3d {
-  transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
-}
-
-.card3d.easing {
-  transition: transform 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.face {
-  transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.face-back {
-  transform: rotateY(180deg);
-}
-
-/* 每一层自己圆角 —— 不用 overflow:hidden, 否则会压平 3D */
-.layer {
-  position: absolute;
-  left: 0;
-  top: 0;
+.card-img {
   width: 100%;
   height: 100%;
   display: block;
   border-radius: 22rpx;
-  box-shadow: 0 18rpx 40rpx rgba(22, 24, 29, 0.18);
+  box-shadow: 0 18rpx 40rpx rgba(22, 24, 29, 0.2);
 }

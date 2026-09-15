@@ -1,0 +1,48 @@
+<!-- 导入卡牌: 手输 8 位导入码 -->
+<view class="page" style="padding-top:{{statusBar}}px">
+  <view class="bar-in">
+    <view class="ico back" bindtap="goBack"></view>
+  </view>
+
+  <view class="body">
+    <view class="title">导入卡牌</view>
+    <view class="sub">输入我们发给你的 8 位导入码</view>
+
+    <view class="field {{tipKind === 'warn' ? 'field-warn' : ''}}">
+      <input
+        class="input latin"
+        type="text"
+        value="{{code}}"
+        maxlength="9"
+        placeholder="XXXX-XXXX"
+        placeholder-class="ph"
+        confirm-type="done"
+        bindinput="onInput"
+        bindconfirm="onSubmit"
+      />
+    </view>
+
+    <view class="tip" wx:if="{{tip}}">{{tip}}</view>
+
+    <view class="btn {{busy ? 'busy' : ''}}" bindtap="onSubmit">
+      {{busy ? '正在导入…' : '导入'}}
+    </view>
+
+    <view class="note">一个导入码只能被一个微信号导入一次，导入后这张卡就一直在你的收藏里。</view>
+
+    <!-- 本地演示模式: 给两个能用的码, 点一下自动填入 -->
+    <view class="demo" wx:if="{{demo.length}}">
+      <view class="demo-h">本地演示码（点一下填入）</view>
+      <view class="demo-row">
+        <view
+          class="demo-code latin"
+          wx:for="{{demo}}"
+          wx:key="*this"
+          data-code="{{item}}"
+          bindtap="useDemo"
+        >{{item}}</view>
+      </view>
+      <view class="demo-note" bindlongpress="onReset">现在还没连云开发，用的是手机本地登记处：换台手机就能再领一次。正式环境由云开发保证只能领一次。（长按这里可重置演示）</view>
+    </view>
+  </view>
+</view>

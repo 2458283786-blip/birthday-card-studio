@@ -16,9 +16,23 @@
   color: var(--ink);
 }
 
+.head-right {
+  display: flex;
+  align-items: center;
+}
+
 .count {
   font-size: 20rpx;
   color: var(--ink-faint);
+}
+
+.import-btn {
+  margin-left: 28rpx;
+  padding: 6rpx 20rpx;
+  font-size: 21rpx;
+  color: var(--ink);
+  border: 1rpx solid var(--hair);
+  border-radius: 10rpx;
 }
 
 .grid {
@@ -60,9 +74,9 @@
   color: var(--ink-faint);
 }
 
-/* 空态 */
+/* 空态: 不留空卡框, 直接告诉他怎么把卡拿进来 */
 .empty {
-  padding: 240rpx 48rpx 0;
+  padding: 200rpx 48rpx 0;
   text-align: center;
 }
 
@@ -75,4 +89,34 @@
   margin-top: 18rpx;
   font-size: 24rpx;
   color: var(--ink-faint);
+}
+
+.empty-btn {
+  margin: 56rpx auto 0;
+  width: 360rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
+  background: var(--ink);
+  color: #ffffff;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.08em;
+}
+
+/* 本地演示模式才有 */
+.demo {
+  margin-top: 140rpx;
+}
+
+.demo-h {
+  font-size: 21rpx;
+  color: var(--ink-faint);
+}
+
+.demo-code {
+  margin-top: 18rpx;
+  font-size: 24rpx;
+  color: var(--ink-muted);
 }

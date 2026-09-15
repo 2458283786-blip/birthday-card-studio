@@ -31495,6 +31495,35 @@ function refreshIcons() {
     el.replaceChildren(svg);
   });
 }
+function addShadow() {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  const ctx = c.getContext("2d");
+  const grad = ctx.createRadialGradient(128, 128, 6, 128, 128, 128);
+  grad.addColorStop(0, "rgba(29,35,25,0.13)");
+  grad.addColorStop(0.4, "rgba(29,35,25,0.055)");
+  grad.addColorStop(1, "rgba(29,35,25,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+  shadow = new Mesh(
+    new PlaneGeometry(8.8, 11.8),
+    new MeshBasicMaterial({
+      map: canvasTexture(c),
+      transparent: true,
+      depthWrite: false
+    })
+  );
+  shadow.position.set(0.28, -0.48, -0.5);
+  scene.add(shadow);
+}
+function renderIconNode(node) {
+  const [tag, attrs = {}, children = []] = node;
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+  for (const child of children) el.appendChild(renderIconNode(child));
+  return el;
+}
 function notice(message) {
   clearTimeout(noticeTimer);
   $("notice").textContent = message;

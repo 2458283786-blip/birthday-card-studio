@@ -7,30 +7,17 @@
   bindtouchend="{{holo.touchEnd}}"
   bindtouchcancel="{{holo.touchEnd}}"
 >
-  <!-- float: 静置时轻微浮动(CSS 动画) · motion: 陀螺仪(逻辑层) · flip: 翻面 · card3d: 手指拖动(WXS) -->
+  <!--
+    float:  静置轻微浮动(CSS 动画)
+    motion: 陀螺仪跟随(逻辑层, 约 16fps + CSS 过渡补顺滑)
+    flip:   翻面(逻辑层, 转到 90° 侧对屏幕时才换图, 全程只有一张图 → 最稳)
+    card3d: 手指拖动(WXS 直接改样式, 不走 setData)
+  -->
   <view class="floater {{floatOn ? 'on' : ''}}">
     <view class="motion" style="{{motionStyle}}">
-      <view class="flipper {{flipped ? 'flipped' : ''}}">
+      <view class="flipper" style="{{flipStyle}}">
         <view class="card3d">
-
-          <view class="face face-front">
-            <block wx:if="{{!useFlat}}">
-              <image
-                wx:for="{{layers}}"
-                wx:key="name"
-                class="layer"
-                src="{{item.src}}"
-                mode="aspectFill"
-                style="transform: translateZ({{item.z}}rpx)"
-              />
-            </block>
-            <image wx:else class="layer" src="{{flat}}" mode="aspectFill" />
-          </view>
-
-          <view class="face face-back" wx:if="{{hasBack}}">
-            <image class="layer" src="{{back}}" mode="aspectFill" />
-          </view>
-
+          <image class="card-img" src="{{src}}" mode="aspectFill" binderror="onImgError" />
         </view>
       </view>
     </view>

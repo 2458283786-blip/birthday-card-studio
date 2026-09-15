@@ -1,0 +1,9 @@
+{
+  "name": "claimCard",
+  "version": "1.0.0",
+  "description": "导入码认领: 一个码只能被一个微信号领走",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

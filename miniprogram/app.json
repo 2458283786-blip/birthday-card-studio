@@ -1,7 +1,8 @@
 {
   "pages": [
     "pages/collection/index",
-    "pages/card/index"
+    "pages/card/index",
+    "pages/import/index"
   ],
   "window": {
     "navigationStyle": "custom",

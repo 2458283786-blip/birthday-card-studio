@@ -1,9 +1,12 @@
-<!-- 收藏馆: 白底 · 一行两个 · 只写卡号和日期 -->
+<!-- 收藏馆: 白底 · 一行两个 · 只显示已经导入的卡 -->
 <view class="page" style="padding-top:{{statusBar}}px">
 
   <view class="head">
     <text class="latin brand">Collection</text>
-    <text class="latin count">{{countText}}</text>
+    <view class="head-right">
+      <text class="latin count" wx:if="{{countText}}">{{countText}}</text>
+      <view class="latin import-btn" bindtap="onImport">导入</view>
+    </view>
   </view>
   <view class="hair"></view>
 
@@ -24,10 +27,16 @@
     </view>
   </view>
 
-  <!-- 空态: 不留空卡框 -->
-  <view class="empty" wx:else>
+  <!-- 空态: 不留空卡框, 直接告诉他怎么把卡拿进来 -->
+  <view class="empty" wx:elif="{{!loading}}">
     <view class="empty-title">还没有卡</view>
-    <view class="empty-sub">做好第一张卡后，它会出现在这里</view>
+    <view class="empty-sub">输入我们发给你的导入码，卡就会出现在这里</view>
+    <view class="empty-btn" bindtap="onImport">输入导入码</view>
+
+    <view class="demo" wx:if="{{demo.length}}">
+      <view class="demo-h">本地演示码（长按可重置）</view>
+      <view class="demo-code latin" wx:for="{{demo}}" wx:key="*this" bindlongpress="onResetMock">{{item}}</view>
+    </view>
   </view>
 
 </view>

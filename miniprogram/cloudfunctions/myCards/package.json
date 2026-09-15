@@ -1,0 +1,9 @@
+{
+  "name": "myCards",
+  "version": "1.0.0",
+  "description": "我的收藏: 按 openid 返回已领到的卡",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

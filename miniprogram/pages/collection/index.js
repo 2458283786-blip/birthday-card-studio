@@ -1,25 +1,39 @@
-const { listCards } = require('../../utils/cardview.js');
+const api = require('../../utils/api.js');
 
 Page({
   data: {
     statusBar: 20,
     cards: [],
-    countText: ''
+    countText: '',
+    loading: true,
+    demo: []
   },
 
   onLoad() {
     const app = getApp();
-    this.setData({ statusBar: (app && app.globalData.statusBarHeight) || 20 });
+    this.setData({
+      statusBar: (app && app.globalData.statusBarHeight) || 20,
+      demo: api.demoCodes()
+    });
+  },
+
+  // 从导入页回来、或在别处领了新卡, 都要刷新
+  onShow() {
     this.load();
   },
 
   load() {
-    listCards().then((cards) => {
+    api.listCards().then((cards) => {
       this.setData({
         cards,
+        loading: false,
         countText: cards.length ? `${cards.length} CARDS` : ''
       });
     });
+  },
+
+  onImport() {
+    wx.navigateTo({ url: '/pages/import/index' });
   },
 
   // 点一张卡 → 带着它在屏幕上的位置跳到卡牌页, 卡牌页据此做"从原位放大"的过渡
@@ -37,6 +51,14 @@ Page({
       }
       wx.navigateTo({ url });
     });
+  },
+
+  /* 仅本地演示模式: 清空本地登记处, 方便反复试 */
+  onResetMock() {
+    if (!api.isMock()) return;
+    api.resetMock();
+    this.load();
+    wx.showToast({ title: '演示记录已重置', icon: 'none' });
   },
 
   onShareAppMessage() {
