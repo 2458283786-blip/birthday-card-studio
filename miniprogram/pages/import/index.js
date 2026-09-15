@@ -11,7 +11,7 @@ const MSG = {
 
 function stamp(ts) {
   const d = new Date(ts || Date.now());
-  const p = (n) => String(n).padStart(2, '0');
+  const p = (n) => (n < 10 ? '0' + n : String(n));
   return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
 }
 

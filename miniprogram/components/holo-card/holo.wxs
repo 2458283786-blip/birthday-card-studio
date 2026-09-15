@@ -1,15 +1,28 @@
-/* 卡牌手势: 用 WXS 直接改样式, 不走 setData —— 这样拖动才是"跟手"的
- * 逻辑层只负责"点击翻面"这一个动作(WXS 通过 callMethod 通知)。
- * 事件里没有任何参数传递, 状态就存在这个模块里, 每个页面一份。
+/* 卡牌手势 + 层间视差
+ * ==================
+ * 1) 手指拖动 → 直接改样式(WXS 在渲染层, 不走 setData), 所以"跟手"。
+ * 2) 但"跟手"不等于"1:1 硬跟" —— 网页版是 rotation += (target-rotation)*(1-e^{-dt*8})，
+ *    时间常数约 125ms。这里用等价的 CSS 过渡(120ms)做同样的平滑, 手感才对。
+ * 3) 松手不瞬间归零: 挂上 .easing(900ms 缓出)慢慢飘回, 交给外层的"漂浮"动画接管。
+ * 4) 层间视差直接抄 shader 的公式:
+ *      uView = (-cos(rx)*sin(ry), sin(rx), cos(rx)*cos(ry))   // 相机方向, 卡牌本地空间
+ *      uvShift = uView.xy / max(|uView.z|,.4) * depth * 0.20
+ *      内容位移(px) = -uvShift * 卡牌尺寸            // 采样往前移 = 画面往后走
+ *    文字层不参与视差(和 shader 一致: 它固定贴在卡面)。
+ *
+ * 公式在 components/holo-card/index.js 里有一份同样的实现(陀螺仪那条路径)，
+ * 改这里必须同步改那边。
  */
-var x = 0;        // 当前 rotateY
-var y = 0;        // 当前 rotateX
-var bx = 0;
-var by = 0;
-var sx = 0;
-var sy = 0;
-var dragging = false;
-var moved = 0;
+var S = {
+  rx: 0, ry: 0, rz: 0,
+  bx: 0, by: 0,
+  sx: 0, sy: 0,
+  dragging: false,
+  moved: 0,
+  w: 292, h: 438,
+  depths: { background: -0.30, subject: 0.34, effects: 0.64 },
+  els: null
+};
 
 function clamp(v, a, b) {
   if (v < a) return a;
@@ -17,52 +30,133 @@ function clamp(v, a, b) {
   return v;
 }
 
+function num(v, fallback) {
+  var n = parseFloat(v);
+  return isNaN(n) ? fallback : n;
+}
+
 function apply(ins) {
   var card = ins.selectComponent('.card3d');
   if (!card) return;
   card.setStyle({
-    transform: 'rotateX(' + y.toFixed(2) + 'deg) rotateY(' + x.toFixed(2) + 'deg)'
+    transform: 'rotateX(' + S.rx.toFixed(2) + 'deg) rotateY(' +
+      S.ry.toFixed(2) + 'deg) rotateZ(' + S.rz.toFixed(2) + 'deg)'
   });
+}
+
+function applyLayers() {
+  var els = S.els;
+  if (!els) return;
+  var rx = S.rx * Math.PI / 180;
+  var ry = S.ry * Math.PI / 180;
+  var cx = Math.cos(rx), cy = Math.cos(ry);
+  var vx = -cx * Math.sin(ry);
+  var vy = Math.sin(rx);
+  var vz = cx * cy;
+  var az = Math.abs(vz);
+  if (az < 0.4) az = 0.4;
+  var kx = -(vx / az) * 0.20 * S.w;
+  var ky = -(vy / az) * 0.20 * S.h;
+  var names = ['background', 'subject', 'effects'];
+  var keys = ['bg', 'su', 'fx'];
+  for (var i = 0; i < names.length; i++) {
+    var el = els[keys[i]];
+    if (!el) continue;
+    var d = S.depths[names[i]] || 0;
+    var dx = kx * d;
+    var dy = ky * d;
+    var sc = 1;
+    if (names[i] === 'background') {
+      // 背景要放大一点, 否则位移之后卡边会露出空隙
+      sc = 1 + 2 * (Math.abs(dx) / S.w) + 2 * (Math.abs(dy) / S.h);
+      if (sc > 1.2) sc = 1.2;
+    }
+    el.setStyle({ transform: 'translate(' + dx.toFixed(1) + 'px, ' + dy.toFixed(1) +
+      'px) scale(' + sc.toFixed(3) + ')' });
+  }
+  // 文字层固定不动: 不设置就是"贴"在卡面上
+}
+
+function resetLayers() {
+  var els = S.els;
+  if (!els) return;
+  var keys = ['bg', 'su', 'fx'];
+  for (var i = 0; i < keys.length; i++) {
+    if (els[keys[i]]) {
+      els[keys[i]].setStyle({ transform: 'translate(0px, 0px) scale(1)' });
+    }
+  }
+}
+
+function cacheEls(ins) {
+  S.els = {
+    bg: ins.selectComponent('.l-bg'),
+    su: ins.selectComponent('.l-sub'),
+    fx: ins.selectComponent('.l-fx')
+  };
+}
+
+function readDataset(e) {
+  var ds = (e.currentTarget && e.currentTarget.dataset) || {};
+  S.w = num(ds.w, S.w);
+  S.h = num(ds.h, S.h);
+  S.depths.background = num(ds.dbg, S.depths.background);
+  S.depths.subject = num(ds.dsu, S.depths.subject);
+  S.depths.effects = num(ds.dfx, S.depths.effects);
 }
 
 function touchStart(e, ins) {
   var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
   if (!t) return;
-  sx = t.pageX;
-  sy = t.pageY;
-  bx = x;
-  by = y;
-  dragging = true;
-  moved = 0;
+  readDataset(e);
+  cacheEls(ins);
+  S.sx = t.pageX;
+  S.sy = t.pageY;
+  S.bx = S.rx;
+  S.by = S.ry;
+  S.dragging = true;
+  S.moved = 0;
   var card = ins.selectComponent('.card3d');
-  if (card) card.removeClass('easing');
+  if (card) {
+    card.removeClass('easing');
+    card.addClass('lifting');
+  }
+  ins.callMethod('setDragging', true);
 }
 
 function touchMove(e, ins) {
-  if (!dragging) return;
+  if (!S.dragging) return;
   var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
   if (!t) return;
-  var dx = t.pageX - sx;
-  var dy = t.pageY - sy;
+  var dx = t.pageX - S.sx;
+  var dy = t.pageY - S.sy;
   var dist = Math.abs(dx) + Math.abs(dy);
-  if (dist > moved) moved = dist;
-  x = clamp(bx + dx * 0.38, -30, 30);
-  y = clamp(by - dy * 0.30, -24, 24);
+  if (dist > S.moved) S.moved = dist;
+  // 增益比网页版略小, 加上 120ms 过渡 → "有重量"而不是硬邦邦
+  S.ry = clamp(S.by + dx * 0.34, -32, 32);
+  S.rx = clamp(S.bx - dy * 0.26, -26, 26);
+  S.rz = clamp(-dx * 0.02, -3, 3);      // 一点点扭转, 让动作活起来
   apply(ins);
+  applyLayers();
 }
 
 function touchEnd(e, ins) {
-  if (!dragging) return;
-  dragging = false;
+  if (!S.dragging) return;
+  S.dragging = false;
   var card = ins.selectComponent('.card3d');
-  if (card) card.addClass('easing');
-  if (moved < 10) {
-    // 几乎没移动 → 当成"点了一下"
-    ins.callMethod('onCardTap');
+  if (card) {
+    card.removeClass('lifting');
+    card.addClass('easing');            // 900ms 缓缓飘回, 不是瞬间复原
   }
-  x = 0;
-  y = 0;
+  if (S.moved < 10) {
+    ins.callMethod('onCardTap');        // 几乎没移动 → 当成"点了一下"(翻面)
+  }
+  S.rx = 0;
+  S.ry = 0;
+  S.rz = 0;
   apply(ins);
+  resetLayers();                        // 层的位移也一起缓慢归位
+  ins.callMethod('setDragging', false);
 }
 
 module.exports = {

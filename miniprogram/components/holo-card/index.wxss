@@ -1,48 +1,104 @@
-/* 卡牌: 整张成品图 + 浮动/陀螺仪/翻面/拖动
- * 四层包装各管一件事, 互不打架:
- *   .floater 静置浮动(动画) · .motion 陀螺仪(setData) · .flipper 翻面(JS) · .card3d 拖动(WXS)
- * 第一版不拆分层: 拆层会被透视缩放, 画面就和工坊生成的成品卡不一致。
+/* 卡牌: 分层 + 层间视差 + 整卡 3D + 太空漂浮
+ * ==========================================
+ * 关键取舍:
+ *  1) 层不做 translateZ, 而是在"裁剪成卡牌形状"的盒子里做 2D 位移。
+ *     用 translateZ 会被透视缩放, 拼回去就不是工坊生成的那张卡了;
+ *     2D 位移既能出纵深, 静止时又和成品整图一模一样。
+ *  2) 拖动不瞬间归零: .easing 给 900ms 缓出, 让卡慢慢飘回并交给漂浮动画接管。
  */
 .stage {
   position: relative;
   width: 100%;
   padding-bottom: 150%;
-  perspective: 1400rpx;
-  -webkit-perspective: 1400rpx;
+  perspective: 1600rpx;
+  -webkit-perspective: 1600rpx;
 }
 
-.floater,
+.drift,
+.breathe,
 .motion,
 .flipper,
-.card3d {
+.card3d,
+.clip {
   position: absolute;
   left: 0;
   top: 0;
   right: 0;
   bottom: 0;
+}
+
+.drift,
+.breathe,
+.motion,
+.flipper {
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
 }
 
-.floater.on {
-  animation: floaty 7s ease-in-out infinite;
+/* 1. 太空漂浮: 很慢、幅度小、带一点自转 —— 不动的时候也像浮着 */
+.drift.on {
+  animation: drift 17s ease-in-out infinite;
 }
 
-@keyframes floaty {
-  0%   { transform: translate3d(0, 0, 0) rotate(-0.3deg); }
-  50%  { transform: translate3d(0, -10rpx, 0) rotate(0.3deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(-0.3deg); }
+@keyframes drift {
+  0%   { transform: translate3d(0, 0, 0) rotate(-0.5deg); }
+  25%  { transform: translate3d(6rpx, -16rpx, 0) rotate(0.15deg); }
+  50%  { transform: translate3d(0, -26rpx, 0) rotate(0.5deg); }
+  75%  { transform: translate3d(-6rpx, -14rpx, 0) rotate(-0.1deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(-0.5deg); }
 }
 
-/* 翻面的过渡写在 JS 的 flipStyle 里(要分两段), 这里不设 transition */
+/* 2. 3D 呼吸: 静止时也有立体感(周期和 drift 错开, 不会看出循环) */
+.breathe {
+  animation: breathe 13s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%   { transform: rotateX(-3deg) rotateY(3.2deg); }
+  50%  { transform: rotateX(3deg) rotateY(-3.2deg); }
+  100% { transform: rotateX(-3deg) rotateY(3.2deg); }
+}
+
+/* 3. 陀螺仪(逻辑层写), 4. 翻面(逻辑层写) */
 .motion {
   transition: transform 220ms ease-out;
 }
 
-.card-img {
+/* 5. 手指拖动: 120ms 过渡 = 网页版 rotation += (target-rotation)*(1-e^{-dt*8}) 的等价手感 */
+.card3d {
+  transition: transform 120ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+}
+
+.card3d.lifting .clip {
+  box-shadow: 0 40rpx 90rpx rgba(22, 24, 29, 0.32);
+}
+
+/* 松手: 慢慢飘回, 不是瞬间复原 */
+.card3d.easing {
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card3d.easing .layer {
+  transition: transform 760ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 6. 裁剪成卡牌形状 */
+.clip {
+  overflow: hidden;
+  border-radius: 24rpx;
+  background: #0b0f1a;
+  box-shadow: 0 24rpx 60rpx rgba(22, 24, 29, 0.22);
+  transition: box-shadow 300ms ease;
+}
+
+.layer {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
   display: block;
-  border-radius: 22rpx;
-  box-shadow: 0 18rpx 40rpx rgba(22, 24, 29, 0.2);
+  /* 每一层自己带一点过渡, 让视差跟随时是"液态"而不是跳变 */
+  transition: transform 140ms ease-out;
 }

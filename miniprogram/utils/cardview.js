@@ -4,22 +4,20 @@
  * 不管是本地打包的 Card Package，还是云开发返回的记录，最终都经过这里变成同一种"视图"，
  * 页面只认这个结构 —— 以后换数据来源，页面代码不用改。
  *
- * 同时负责降级规则（文档 §16）：
- *   没有分层素材 → 只用正面整图；没有背面 → 不能翻面；没填的字段 → 整行不出现。
+ * 降级规则（文档 §16）：
+ *   缺少分层素材 → 只用正面成品整图；没有背面 → 不能翻面；没填的字段 → 整行不出现。
  */
 const manifest = require('../data/cards/manifest.js');
 
-// 分层的前后顺序与深度（rpx）。留到第二版 WebGL 渲染时使用。
-const DEPTH = { background: -96, effects: -50, subject: -16, lineart: 48, text: 56 };
-const LAYER_ORDER = ['background', 'effects', 'subject', 'lineart', 'text'];
-
 /**
- * 第一版：卡面直接用成品整图（front.webp / back.webp），保证与工作台生成的卡 100% 一致。
- * 为什么不用分层：透视会把每一层缩放（后层缩小、前层放大），拼回去就和成品图不一样；
- * 层间纵深是 shader 的活，交给第二版 WebGL（与网页版同一套公式）。
- * 改成 true 必须和第二版渲染器一起开。
+ * 分层的绘制顺序 = 网页版 shader 的合成顺序（这一条必须和 shader 一致，否则画面就错了）：
+ *   背景 → 主体 → 光点 → 文字
+ * 注意 lineart 不在里面：它在 shader 里只是给主体加高光的蒙版，不是一张可见图层。
  */
-const DEPTH_READY = false;
+const LAYER_ORDER = ['background', 'subject', 'effects', 'text'];
+
+// 层深度的兜底值；真实值来自 card.json 的 _studio.parameters（打包时写进 manifest）
+const DEFAULT_DEPTH = { background: -0.30, subject: 0.34, effects: 0.64 };
 
 function prettyDate(iso) {
   return (iso || '').replace(/-/g, '.');
@@ -45,7 +43,11 @@ function buildView(meta, assets) {
   const layerMap = assets.layers || {};
   const layers = LAYER_ORDER
     .filter((name) => layerMap[name])
-    .map((name) => ({ name, src: layerMap[name], z: DEPTH[name] }));
+    .map((name) => ({ name, src: layerMap[name] }));
+
+  // 有背景 + 主体就能分层显示(其余层本来就是可选的)；
+  // 缺这两层就退回成品整图 —— 两者画面一致，因为整图就是这些层压出来的。
+  const useFlat = !(layerMap.background && layerMap.subject);
 
   // 只有真的填了的字段才进视图：没填的整行不出现（不留空占位）
   const notes = [];
@@ -55,8 +57,6 @@ function buildView(meta, assets) {
   if (meta.fields.ownerName) owners.push({ label: 'FOR', value: meta.fields.ownerName });
   if (meta.fields.creatorName) owners.push({ label: 'CREATED BY', value: meta.fields.creatorName });
 
-  const hasBack = !!assets.back;
-
   return {
     cardId: meta.cardId,
     displayId: meta.displayId || meta.cardId,
@@ -65,17 +65,18 @@ function buildView(meta, assets) {
     surface: meta.surface || 'dark',
     // 卡牌页背景：浅色卡用浅灰底，深色卡用白底（打包时按卡面取色算好 surface）
     background: (meta.surface === 'light') ? '#f2f3f5' : '#ffffff',
-    hasBack,
+    hasBack: !!assets.back,
     back: assets.back || '',
     flat: assets.front || '',
     layers,
-    useFlat: !DEPTH_READY || layers.length === 0,
+    depths: meta.depths || DEFAULT_DEPTH,
+    useFlat,
     notes,
     owners
   };
 }
 
-/** 本地打包的卡（收藏页/卡牌页的数据来源之一） */
+/** 本地打包的卡 */
 function toView(item) {
   return buildView({
     cardId: item.cardId,
@@ -83,6 +84,7 @@ function toView(item) {
     title: item.title,
     date: item.date,
     surface: item.surface,
+    depths: item.depth,
     fields: item.fields || fieldsOf(item)
   }, {
     front: item.front,
@@ -102,6 +104,7 @@ function viewFromRecord(record) {
     title: card.title,
     date: card.date,
     surface: card.surface || 'dark',
+    depths: card.depth,
     fields: card.fields || fieldsOf(card)
   }, {
     front: assets.front,
@@ -114,4 +117,4 @@ function rawCard(cardId) {
   return manifest.cards.find((c) => c.cardId === cardId) || null;
 }
 
-module.exports = { toView, viewFromRecord, rawCard, fieldsOf, DEPTH_READY };
+module.exports = { toView, viewFromRecord, rawCard, fieldsOf, LAYER_ORDER };

@@ -4,7 +4,9 @@ const cfg = require('./config.js');
 App({
   globalData: {
     statusBarHeight: 20,
-    cardWidthPx: 320,
+    windowWidth: 375,
+    windowHeight: 812,
+    cardWidthPx: 292,
     mode: cfg.mode
   },
 
@@ -17,8 +19,10 @@ App({
     }
     const width = win.windowWidth || 375;
     this.globalData.statusBarHeight = win.statusBarHeight || 20;
-    // 卡牌页的卡宽: 屏宽 - 左右各 24px
-    this.globalData.cardWidthPx = Math.min(360, width - 48);
+    this.globalData.windowWidth = width;
+    this.globalData.windowHeight = win.windowHeight || 812;
+    // 卡牌宽度: 屏宽的 78%, 上限 300px(原来铺得太满, 现在留出呼吸感)
+    this.globalData.cardWidthPx = Math.min(300, Math.round(width * 0.78));
 
     // 正式模式: 初始化云开发(需要正式 AppID; 测试号用不了云开发, 所以默认走 mock)
     if (cfg.mode === 'cloud' && wx.cloud) {

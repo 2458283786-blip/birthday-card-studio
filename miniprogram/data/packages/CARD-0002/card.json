@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0",
-  "cardId": "CARD-0001",
-  "displayId": "CARD #0001",
-  "internalId": "77b7d18f0d9d40ee",
+  "cardId": "CARD-0002",
+  "displayId": "CARD #0002",
+  "internalId": "1cc770a5af8b4d30",
   "theme": "birthday",
   "template": "birthday-night",
   "title": null,
@@ -16,18 +16,27 @@
     "name": ""
   },
   "content": {
-    "age": "20",
-    "subtitle": "HAPPY BIRTHDAY",
-    "message": "MAY EVERY YEAR BE KIND TO YOU",
-    "signature": "A DAY WORTH KEEPING",
-    "name": null
+    "age": "22",
+    "subtitle": "lucky",
+    "message": "一帆风顺",
+    "signature": null,
+    "name": "风儿"
   },
   "material": {
     "type": "pearl",
     "holoEnabled": true,
-    "foil": 0.55,
-    "regions": {},
-    "amounts": {}
+    "foil": 0.52,
+    "regions": {
+      "frame": "pearl",
+      "text": "matte",
+      "subject": "pearl",
+      "background": "pearl"
+    },
+    "amounts": {
+      "frame": 0.5,
+      "subject": 0.35,
+      "background": 0.35
+    }
   },
   "interaction": {
     "parallax": true,
@@ -60,6 +69,6 @@
   "depth": {
     "background": -0.3,
     "subject": 0.34,
-    "effects": 0.64
+    "effects": 0.62
   }
 }

@@ -1,14 +1,16 @@
 # ---- Blender 便携版(1.27GB, 由 RuiC skill 自动下载安装, 不入库) ----
-demo-koi/tools/
-tools/
-
-# ---- 运行期 / 中间产物 ----
+# 注意: 必须写成 /demo-koi/tools/, 否则会把项目自己的 tools/ 也一起忽略掉
+/demo-koi/tools/
 card-studio/projects/
 birthday-build/
 exports/
 _video-frames/
 *.part
 *.log
+
+# ---- 小程序发布: 密钥与本地产物, 绝不入库 ----
+mp-secret.json
+publish/
 
 # ---- Python / Node ----
 __pycache__/

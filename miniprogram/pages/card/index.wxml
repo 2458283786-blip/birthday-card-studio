@@ -1,4 +1,4 @@
-<!-- 卡牌页: 白底 · 卡片铺满 · 拖动/陀螺仪/翻面 · 下方保留卡牌字段 -->
+<!-- 卡牌页: 白底 · 卡片居中 · 拖动/陀螺仪/翻面 · 卡下方只留卡号与日期 -->
 <view class="page" style="background:{{bg}}">
   <view style="height:{{statusBar}}px"></view>
 
@@ -13,28 +13,27 @@
   </view>
 
   <block wx:if="{{card}}">
-    <view class="stage-wrap">
+    <view class="stage-wrap" style="padding: {{padT}}px {{padX}}px 0">
       <view class="enter {{ready ? 'in' : ''}}" style="{{enterStyle}}">
         <holo-card card="{{card}}" />
       </view>
     </view>
 
+    <!-- 卡下方只留身份信息: 卡号 + 纪念日期。
+         寄语/署名/拥有者这些字段没有删, 它们仍然在卡面与卡背上;
+         这里不重复显示, 页面才是干净的。 -->
     <view class="meta {{ready ? 'in' : ''}}">
       <view class="latin m-id">{{card.displayId}}<text class="sep">·</text>{{card.dateText}}</view>
-      <view class="m-note" wx:for="{{card.notes}}" wx:key="*this">{{item}}</view>
-      <view class="m-owner" wx:for="{{card.owners}}" wx:key="label">
-        <text class="latin label">{{item.label}}</text>
-        <text class="value">{{item.value}}</text>
-      </view>
     </view>
 
     <view class="hint {{hintOff ? 'off' : ''}}">拖动旋转 · 点击翻面</view>
   </block>
 
-  <!-- 找不到这张卡: 显示一句提示, 不报错也不白屏 -->
+  <!-- 找不到这张卡 / 数据层出错: 说清楚是哪一种, 不装成"内容为空" -->
   <view class="missing" wx:else>
-    <view class="missing-t">这张卡不在这里</view>
-    <view class="missing-s" wx:if="{{missing}}">它可能还没做好，或者链接不对</view>
+    <view class="missing-t">{{failed ? '卡牌数据读取出错' : '这张卡不在这里'}}</view>
+    <view class="missing-s" wx:if="{{failed}}">看一下控制台的报错信息</view>
+    <view class="missing-s" wx:elif="{{missing}}">它可能还没做好，或者链接不对</view>
   </view>
 
   <!-- 保存用画布(不在屏幕上显示) -->

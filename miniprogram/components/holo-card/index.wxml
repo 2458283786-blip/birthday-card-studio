@@ -1,23 +1,44 @@
 <wxs module="holo" src="./holo.wxs" />
 
+<!--
+  包装层各管一件事, 互不打架:
+    .drift   太空漂浮(慢速位移+微转, 17s)
+    .breathe 3D 呼吸(慢速 rotateX/rotateY, 13s) —— 静止时也一直是立体的
+    .motion  陀螺仪跟随(逻辑层)
+    .flipper 翻面(逻辑层, 转到 90° 侧对屏幕时才换图)
+    .card3d  手指拖动 + 层间视差(WXS 直接改样式, 最跟手)
+    .clip    裁剪成卡牌形状(圆角), 层在里面按深度错开
+-->
 <view
   class="stage"
+  data-w="{{W}}"
+  data-h="{{H}}"
+  data-dbg="{{depths.background}}"
+  data-dsu="{{depths.subject}}"
+  data-dfx="{{depths.effects}}"
   bindtouchstart="{{holo.touchStart}}"
   bindtouchmove="{{holo.touchMove}}"
   bindtouchend="{{holo.touchEnd}}"
   bindtouchcancel="{{holo.touchEnd}}"
 >
-  <!--
-    float:  静置轻微浮动(CSS 动画)
-    motion: 陀螺仪跟随(逻辑层, 约 16fps + CSS 过渡补顺滑)
-    flip:   翻面(逻辑层, 转到 90° 侧对屏幕时才换图, 全程只有一张图 → 最稳)
-    card3d: 手指拖动(WXS 直接改样式, 不走 setData)
-  -->
-  <view class="floater {{floatOn ? 'on' : ''}}">
-    <view class="motion" style="{{motionStyle}}">
-      <view class="flipper" style="{{flipStyle}}">
-        <view class="card3d">
-          <image class="card-img" src="{{src}}" mode="aspectFill" binderror="onImgError" />
+  <view class="drift {{floatOn ? 'on' : ''}}">
+    <view class="breathe">
+      <view class="motion" style="{{motionStyle}}">
+        <view class="flipper" style="{{flipStyle}}">
+          <view class="card3d">
+            <view class="clip">
+
+              <block wx:if="{{face === 'front' && !useFlat}}">
+                <image class="layer l-bg" src="{{L.background}}" style="{{LS.background}}" mode="aspectFill" />
+                <image class="layer l-sub" src="{{L.subject}}" style="{{LS.subject}}" mode="aspectFill" />
+                <image class="layer l-fx" src="{{L.effects}}" style="{{LS.effects}}" mode="aspectFill" />
+                <image class="layer l-txt" src="{{L.text}}" style="{{LS.text}}" mode="aspectFill" />
+              </block>
+              <image wx:elif="{{face === 'front'}}" class="layer" src="{{flat}}" mode="aspectFill" />
+              <image wx:else class="layer" src="{{back}}" mode="aspectFill" binderror="onImgError" />
+
+            </view>
+          </view>
         </view>
       </view>
     </view>

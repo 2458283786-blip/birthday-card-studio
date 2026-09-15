@@ -1,9 +1,45 @@
-const FLIP_MS = 260;   // 翻面的单程时长(卡片转到侧对屏幕的一半)
+const FLIP_MS = 260;   // 翻面单程时长(卡片转到侧对屏幕的一半)
+const DEPTH_DEFAULT = { background: -0.30, subject: 0.34, effects: 0.64 };
 
 function clamp(v, a, b) {
   if (v < a) return a;
   if (v > b) return b;
   return v;
+}
+
+/**
+ * 层间视差 —— 与网页版 shader 同一套公式（holo.wxs 里也有一份，改要一起改）：
+ *   uView = (-cos(rx)*sin(ry), sin(rx), cos(rx)*cos(ry))
+ *   uvShift = uView.xy / max(|uView.z|,.4) * depth * 0.20
+ *   内容位移(px) = -uvShift * 卡牌尺寸
+ * 文字层不参与视差（shader 里它固定贴在卡面）。
+ */
+function parallaxStyles(rxDeg, ryDeg, W, H, depths) {
+  const d = depths || DEPTH_DEFAULT;
+  const rx = rxDeg * Math.PI / 180;
+  const ry = ryDeg * Math.PI / 180;
+  const cx = Math.cos(rx);
+  const vx = -cx * Math.sin(ry);
+  const vy = Math.sin(rx);
+  const vz = cx * Math.cos(ry);
+  const az = Math.max(Math.abs(vz), 0.4);
+  const kx = -(vx / az) * 0.20 * W;
+  const ky = -(vy / az) * 0.20 * H;
+
+  const out = {};
+  ['background', 'subject', 'effects'].forEach((name) => {
+    const depth = d[name] || 0;
+    const dx = kx * depth;
+    const dy = ky * depth;
+    let sc = 1;
+    if (name === 'background') {
+      // 背景放大一点, 否则位移后卡边会露空隙
+      sc = Math.min(1.2, 1 + 2 * (Math.abs(dx) / W) + 2 * (Math.abs(dy) / H));
+    }
+    out[name] = `transform: translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${sc.toFixed(3)});`;
+  });
+  out.text = 'transform: translate(0px, 0px);';
+  return out;
 }
 
 Component({
@@ -13,25 +49,43 @@ Component({
       value: null,
       observer(value) {
         if (!value) return;
+        const L = {};
+        (value.layers || []).forEach((l) => {
+          L[l.name] = l.src;
+        });
+        const app = getApp();
+        const W = (app && app.globalData.cardWidthPx) || 292;
+        const H = Math.round(W * 1.5);
+        const depths = value.depths || DEPTH_DEFAULT;
         this.setData({
+          L,
+          W,
+          H,
+          depths,
           flat: value.flat || '',
           back: value.back || '',
           hasBack: !!value.hasBack,
+          useFlat: !!value.useFlat,
           face: 'front',
-          src: value.flat || '',
-          flipStyle: 'transform: rotateY(0deg); transition: none;'
+          flipStyle: 'transform: rotateY(0deg); transition: none;',
+          motionStyle: '',
+          LS: parallaxStyles(0, 0, W, H, depths)
         });
       }
     }
   },
 
   data: {
+    W: 292,
+    H: 438,
+    depths: DEPTH_DEFAULT,
+    L: {},
+    LS: {},
     flat: '',
     back: '',
     hasBack: false,
+    useFlat: true,
     face: 'front',
-    src: '',
-    flipped: false,
     floatOn: true,
     motionStyle: '',
     flipStyle: 'transform: rotateY(0deg); transition: none;'
@@ -39,7 +93,11 @@ Component({
 
   lifetimes: {
     attached() {
+      const app = getApp();
+      const W = (app && app.globalData.cardWidthPx) || 292;
+      this.setData({ W, H: Math.round(W * 1.5) });
       this.motion = { on: false, base: null, cur: { x: 0, y: 0 }, last: 0 };
+      this.dragging = false;
       this.startMotion();
     },
     detached() {
@@ -58,7 +116,11 @@ Component({
   },
 
   methods: {
-    /* 图片加载失败: 不白屏、不报错, 只是没有画面 —— 留给页面显示空态 */
+    /* 手指按住时, 层的位置归 WXS 管; 陀螺仪不要抢 */
+    setDragging(value) {
+      this.dragging = !!value;
+    },
+
     onImgError() {
       this.triggerEvent('imgerror');
     },
@@ -77,16 +139,14 @@ Component({
       if (toBack && !this.data.back) return;
       this.flipping = true;
 
-      // 第一段: 转到侧面(90°), 图片此时几乎看不见
+      // 第一段: 转到侧面(90°), 此时几乎看不见内容
       this.setData({
         flipStyle: `transform: rotateY(90deg); transition: transform ${FLIP_MS}ms ease-in;`
       });
       this.t1 = setTimeout(() => {
-        // 在"侧对屏幕"的瞬间换图, 再从另一侧转回来 —— 全程只有一张图, 不会镜像
+        // 在"侧对屏幕"的瞬间换内容, 再从另一侧转回来 —— 全程只有一面, 不会镜像
         this.setData({
           face: toBack ? 'back' : 'front',
-          src: toBack ? this.data.back : this.data.flat,
-          flipped: toBack,
           flipStyle: 'transform: rotateY(-90deg); transition: none;'
         });
         this.t2 = setTimeout(() => {
@@ -147,9 +207,14 @@ Component({
       const now = Date.now();
       if (now - m.last < 60) return;          // 约 16fps 写样式, 靠 CSS 过渡补顺滑
       m.last = now;
-      this.setData({
+
+      const patch = {
         motionStyle: `transform: rotateX(${m.cur.x.toFixed(2)}deg) rotateY(${m.cur.y.toFixed(2)}deg);`
-      });
+      };
+      if (!this.dragging) {
+        patch.LS = parallaxStyles(m.cur.x, m.cur.y, this.data.W, this.data.H, this.data.depths);
+      }
+      this.setData(patch);
     }
   }
 });

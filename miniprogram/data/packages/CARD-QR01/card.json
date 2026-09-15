@@ -2,10 +2,10 @@
   "schemaVersion": "1.0",
   "cardId": "CARD-QR01",
   "displayId": "CARD #QR01",
-  "internalId": "e90f06bfbc974000",
+  "internalId": "ecaf1ddafebf4e7b",
   "theme": "birthday",
   "template": "birthday-night",
-  "title": null,
+  "title": "李四",
   "date": "2026-09-11",
   "creator": {
     "id": "",
@@ -16,9 +16,9 @@
     "name": ""
   },
   "content": {
-    "age": "20",
+    "age": "21",
     "subtitle": "HAPPY BIRTHDAY",
-    "message": "KEEP GOING",
+    "message": "NEW WISH, SAME HEART",
     "signature": null,
     "name": "小明"
   },
@@ -54,7 +54,7 @@
   "qr": {
     "enabled": true,
     "target": "showcase",
-    "url": "https://example.com/card/CARD-0001"
+    "url": "https://example.com/new-target"
   },
   "status": "final",
   "cardVersion": 1,
@@ -63,8 +63,12 @@
     "background",
     "subject",
     "effects",
-    "lineart",
     "text"
   ],
-  "surface": "dark"
+  "surface": "dark",
+  "depth": {
+    "background": -0.3,
+    "subject": 0.34,
+    "effects": 0.62
+  }
 }

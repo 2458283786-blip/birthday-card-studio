@@ -1,4 +1,4 @@
-const { getCard } = require('../../utils/cardview.js');
+const { getCard } = require('../../utils/api.js');
 
 function parseRect(s) {
   if (!s) return null;
@@ -8,7 +8,8 @@ function parseRect(s) {
 }
 
 const BAR_H = 44;   // 自绘顶栏高度(px), 与 app.wxss 的 .bar-in 一致
-const TOP_PAD = 8;  // .stage-wrap 的上边距(px)
+const HINT_RESERVE = 72;   // 底部"拖动旋转·点击翻面"提示 + 呼吸空间(px)
+const META_H = 44;         // 卡牌下方只剩一行"卡号 · 日期"的高度(px)
 
 Page({
   data: {
@@ -16,17 +17,26 @@ Page({
     bg: '#ffffff',
     card: null,
     missing: false,
+    failed: false,
     ready: false,
     enterStyle: '',
-    hintOff: false
+    hintOff: false,
+    padX: 24,
+    padT: 8
   },
 
   onLoad(query) {
     const app = getApp();
     const statusBar = (app && app.globalData.statusBarHeight) || 20;
-    const cardW = (app && app.globalData.cardWidthPx) || 327;
-    const width = cardW + 48;
+    const cardW = (app && app.globalData.cardWidthPx) || 292;
+    const width = (app && app.globalData.windowWidth) || (cardW + 48);
+    const winH = (app && app.globalData.windowHeight) || 812;
     const cardH = cardW * 1.5;
+    const padX = Math.max(16, Math.round((width - cardW) / 2));
+    // 垂直位置按屏幕高度算, 让"卡 + 下方字段"这一整块在可视区域里居中
+    // (之前固定 8px 顶边距, 卡就偏上了)
+    const avail = winH - (statusBar + BAR_H) - HINT_RESERVE;
+    const padT = Math.max(8, Math.round((avail - cardH - META_H) / 2));
 
     // 从收藏页缩略图的位置和大小开始 → 再放大铺满屏幕(见 index.wxss 的 .enter)
     const from = parseRect(query && query.from);
@@ -34,12 +44,19 @@ Page({
     if (from && from.w > 4) {
       const scale = from.w / cardW;
       const dx = (from.x + from.w / 2) - width / 2;
-      const dy = (from.y + from.h / 2) - (statusBar + BAR_H + TOP_PAD + cardH / 2);
+      const dy = (from.y + from.h / 2) - (statusBar + BAR_H + padT + cardH / 2);
       enterStyle = `transform: translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0) scale(${scale.toFixed(4)});`;
     }
-    this.setData({ statusBar, enterStyle });
+    this.setData({ statusBar, enterStyle, padX, padT });
 
-    getCard(query && query.id).then((card) => {
+    const cardId = (query && query.id) || '';
+    // 没带卡号(比如在开发者工具里直接编译到这一页) → 回收藏页, 别停在空页面
+    if (!cardId) {
+      wx.reLaunch({ url: '/pages/collection/index' });
+      return;
+    }
+
+    getCard(cardId).then((card) => {
       if (!card) {
         this.setData({ missing: true });
         return;
@@ -50,6 +67,10 @@ Page({
       }, 60);
       // 首次进入的提示: 几秒后自己淡出
       this.hintTimer = setTimeout(() => this.setData({ hintOff: true }), 4200);
+    }).catch((err) => {
+      // 数据层出错时不要再装作"卡不存在", 直接显示错误并打日志 —— 否则会被误判成内容为空
+      console.error('[card] 读取卡片失败', err);
+      this.setData({ card: null, missing: false, failed: true });
     });
   },
 

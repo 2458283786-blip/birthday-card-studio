@@ -3,7 +3,7 @@
   overflow: hidden;
 }
 
-/* 卡片: 屏宽 - 左右各 24px, 比例 2:3 */
+/* 卡片宽度与左右留白由 JS 算(卡宽 = 屏宽 78%, 上限 300px), 这里只兜底 */
 .stage-wrap {
   padding: 8px 24px 0;
 }
@@ -18,7 +18,7 @@
   opacity: 1;
 }
 
-/* 卡片下方的字段: 生成这张卡时真填了的内容 */
+/* 卡片下方的身份信息: 只有卡号和日期一行 */
 .meta {
   padding: 40rpx 48rpx 0;
   text-align: center;
@@ -38,25 +38,6 @@
 .m-id .sep {
   margin: 0 14rpx;
   color: var(--ink-faint);
-}
-
-.m-note {
-  margin-top: 16rpx;
-  font-size: 22rpx;
-  color: var(--ink-muted);
-  letter-spacing: 0.04em;
-}
-
-.m-owner {
-  margin-top: 14rpx;
-  font-size: 22rpx;
-  color: var(--ink-muted);
-}
-
-.m-owner .label {
-  font-size: 18rpx;
-  color: var(--ink-faint);
-  margin-right: 12rpx;
 }
 
 /* 首次进入的提示: 几秒后自动淡出 */
