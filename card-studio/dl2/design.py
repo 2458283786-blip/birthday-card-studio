@@ -604,13 +604,12 @@ def feathered_mask(w, h, feather):
     return Image.fromarray((m * 255).astype(np.uint8), "L")
 
 
-def render_portrait(im, dna, occ, spec, out_path=None):
+def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
     pal = spec["palette"]
-    RIM = 30                          # 塑封围边宽度
-    FEATHER = 16                      # 照片边缘羽化(过渡渐变)
+    RIM, FEATHER = 30, 16
     pw, ph = W - 2 * RIM, H - 2 * RIM
 
-    # —— 照片: 裁切 → 尺寸 → 放大补偿 → clarity → 调色 ——
+    # ---------- 1. 照片 ----------
     crop = im.crop(spec["photo"])
     up = W / float(max(1, crop.width))
     body = crop.resize((pw, ph), Image.Resampling.LANCZOS)
@@ -622,84 +621,91 @@ def render_portrait(im, dna, occ, spec, out_path=None):
     body = clarity(body)
     body = portrait_grade(body, dna)
 
-    # —— 围边: 环境色 → 明亮塑封底(上略亮/下略深) ——
+    # ---------- 2. 围边(环境色 + 竖向渐变) ----------
     env = edge_env_color(body)
     r_top = tuple(int(min(255, c * 1.06 + 8)) for c in env)
-    r_bot = tuple(int(max(0, c * 0.90)) for c in env)
-    canvas = Image.new("RGBA", (W, H), r_top + (255,))
+    r_bot = tuple(int(max(0, c * 0.88)) for c in env)
     g = np.linspace(0, 1, H)[:, None, None]
-    grad = np.concatenate([np.array(r_top, np.float32)[None, None] * (1 - g) +
-                           np.array(r_bot, np.float32)[None, None] * g], 0)
+    grad = np.array(r_top, np.float32)[None, None] * (1 - g) + np.array(r_bot, np.float32)[None, None] * g
     grad = np.repeat(grad[:, :1, :], W, axis=1)
-    canvas = Image.fromarray(np.clip(grad, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+    base = Image.fromarray(np.clip(grad, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
 
-    # —— 贴照片(羽化边缘 → 过渡) ——
-    canvas.paste(body, (RIM, RIM), feathered_mask(pw, ph, FEATHER))
+    # ---------- 3. 照片投影 + 贴照片(羽化) ----------
+    drop = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(drop).rectangle([RIM + 7, RIM + 11, W - RIM + 7, H - RIM + 11],
+                                   fill=(0, 0, 0, 150))
+    base.alpha_composite(drop.filter(ImageFilter.GaussianBlur(16)))
+    base.paste(body, (RIM, RIM), feathered_mask(pw, ph, FEATHER))
 
-    # —— 塑封斜向光泽(整张卡, 边缘更明显) ——
-    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-    t = np.clip(((xx / W) * 0.55 + (yy / H) * 0.45 - 0.02) / 0.75, 0, 1)
-    band = np.exp(-(((xx / W) * 0.62 + (yy / H) * 0.38 - 0.30) / 0.055) ** 2)   # 窄高光带
-    sheen = Image.fromarray((np.clip((1 - t) ** 1.5 * 62 + t ** 2.2 * 18 + band * 54, 0, 255)
-                             .astype(np.uint8)), "L")
-    white = Image.new("RGBA", (W, H), (255, 255, 255, 255))
-    canvas = Image.composite(white, canvas, sheen.point(lambda v: int(v * 0.55)))
-
-    d = ImageDraw.Draw(canvas, "RGBA")
-    # —— 层次: 照片内侧柔和内阴影(压在塑封下) ——
-    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(sh)
-    for i in range(26):
-        a = int(78 * (1 - i / 26.0) ** 1.7)
-        sd.rectangle([RIM + i, RIM + i, W - RIM - 1 - i, H - RIM - 1 - i],
-                     outline=(0, 0, 0, a), width=1)
-    canvas.alpha_composite(sh.filter(ImageFilter.GaussianBlur(9)))
+    # ---------- 4. 内阴影(带方向: 左上亮 → 右下暗) ----------
+    inner = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    idr = ImageDraw.Draw(inner)
+    for k in range(30):
+        a = int(120 * (1 - k / 30.0) ** 1.5)
+        off = k // 3
+        idr.rectangle([RIM + k, RIM + k + off, W - RIM - 1 - k, H - RIM - 1 - k],
+                      outline=(0, 0, 0, a), width=1)
+    base.alpha_composite(inner.filter(ImageFilter.GaussianBlur(8)))
     top_sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     td = ImageDraw.Draw(top_sh)
-    for i in range(84):
-        a = int(58 * (1 - i / 84.0) ** 1.5)
-        td.line([(RIM, RIM + i), (W - RIM, RIM + i)], fill=(0, 0, 0, a))
-    canvas.alpha_composite(top_sh.filter(ImageFilter.GaussianBlur(12)))
+    for k in range(90):
+        td.line([(RIM, RIM + k), (W - RIM, RIM + k)], fill=(0, 0, 0, int(70 * (1 - k / 90.0) ** 1.5)))
+    base.alpha_composite(top_sh.filter(ImageFilter.GaussianBlur(12)))
 
-    # —— 塑封亮边: 内外两条细亮线 ——
-    d.rectangle([RIM - 1, RIM - 1, W - RIM, H - RIM], outline=(255, 255, 255, 120), width=1)
-    d.rectangle([RIM, RIM, W - RIM - 1, H - RIM - 1], outline=(255, 255, 255, 70), width=1)
-    d.rectangle([2, 2, W - 3, H - 3], outline=(255, 255, 255, 112), width=1)
-    d.rectangle([5, 5, W - 6, H - 6], outline=(255, 255, 255, 42), width=1)
-
-    # —— 底部光影暗垫(限制在照片范围内, 保证浅色字可读) ——
+    # ---------- 5. 底部暗垫(限制在照片内, 保证文字可读) ----------
     scrim = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     sd2 = ImageDraw.Draw(scrim)
     top = int(H * 0.46)
-    for i in range(180):
-        tt = i / 179.0
+    for k in range(180):
+        tt = k / 179.0
         y = int(top + (H - RIM - top) * tt)
         sd2.line([(RIM, y), (W - RIM, y)], fill=(0, 0, 0, int(4 + 214 * (tt ** 1.12))))
-    sd2.line([(RIM, RIM), (W - RIM, RIM)], fill=(0, 0, 0, 70))
-    for i in range(90):
-        tt = i / 89.0
+    for k in range(90):
+        tt = k / 89.0
         sd2.line([(RIM, int(RIM + (H * 0.16) * tt)), (W - RIM, int(RIM + (H * 0.16) * tt))],
                  fill=(0, 0, 0, int(66 * (1 - tt))))
-    canvas.alpha_composite(scrim.filter(ImageFilter.GaussianBlur(24)))
+    base.alpha_composite(scrim.filter(ImageFilter.GaussianBlur(24)))
     pad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    pd = ImageDraw.Draw(pad)
-    pd.rounded_rectangle([RIM + 20, int(H * 0.735), W - RIM - 20, int(H * 0.975)],
-                         radius=54, fill=(0, 0, 0, 146))
-    canvas.alpha_composite(pad.filter(ImageFilter.GaussianBlur(50)))
+    ImageDraw.Draw(pad).rounded_rectangle([RIM + 20, int(H * 0.735), W - RIM - 20, int(H * 0.975)],
+                                          radius=54, fill=(0, 0, 0, 146))
+    base.alpha_composite(pad.filter(ImageFilter.GaussianBlur(50)))
 
-    d = ImageDraw.Draw(canvas, "RGBA")
-    ink = (247, 243, 234, 255)
-    soft = (238, 232, 220, 215)
-    faint = (230, 224, 212, 176)
+    # ---------- 6. 卡边缘: 倒角 + 塑封亮线 ----------
+    bd = ImageDraw.Draw(base, "RGBA")
+    for k in range(6):                                   # 倒角: 上/左亮
+        a = int(88 * (1 - k / 6.0))
+        bd.line([(2 + k, 2 + k), (W - 2 - k, 2 + k)], fill=(255, 255, 255, a))
+        bd.line([(2 + k, 2 + k), (2 + k, H - 2 - k)], fill=(255, 255, 255, a))
+    for k in range(6):                                   # 倒角: 下/右暗
+        a = int(70 * (1 - k / 6.0))
+        bd.line([(2 + k, H - 3 - k), (W - 2 - k, H - 3 - k)], fill=(0, 0, 0, a))
+        bd.line([(W - 3 - k, 2 + k), (W - 3 - k, H - 2 - k)], fill=(0, 0, 0, a))
+    bd.rectangle([RIM - 1, RIM - 1, W - RIM, H - RIM], outline=(255, 255, 255, 128), width=1)
+    bd.rectangle([RIM, RIM, W - RIM - 1, H - RIM - 1], outline=(255, 255, 255, 74), width=1)
+    bd.rectangle([2, 2, W - 3, H - 3], outline=(255, 255, 255, 116), width=1)
 
-    # —— 右上: 编号(留在照片区内) ——
+    # ---------- 7. effects 层: 斜向反光带 + 柔光(强视差) ----------
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    t = np.clip(((xx / W) * 0.55 + (yy / H) * 0.45 - 0.02) / 0.75, 0, 1)
+    band = np.exp(-(((xx / W) * 0.62 + (yy / H) * 0.38 - 0.30) / 0.055) ** 2)
+    sheen_a = np.clip((1 - t) ** 1.5 * 62 + t ** 2.2 * 18 + band * 54, 0, 255)
+    fx = Image.new("RGBA", (W, H), (255, 255, 255, 0))
+    fx.putalpha(Image.fromarray(np.clip(sheen_a, 0, 255).astype(np.uint8), "L"))
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse([int(W * 0.12), int(H * 0.08), int(W * 0.78), int(H * 0.52)],
+                                 fill=(255, 250, 240, 40))
+    fx.alpha_composite(glow.filter(ImageFilter.GaussianBlur(70)))
+    composed = base.copy()
+    composed.alpha_composite(fx)
+
+    # ---------- 8. text 层: 排版(中等视差) ----------
+    txt = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(txt, "RGBA")
+    ink, soft, faint = (247, 243, 234, 255), (238, 232, 220, 215), (230, 224, 212, 176)
     if spec["edition"]:
         f = fnt(spec["edition"], 34, "serif")
-        t2 = spec["edition"]
-        w2 = d.textlength(t2, font=f) + 2.6 * max(0, len(t2) - 1)
-        tracked(d, (W - RIM - 34 - w2, H * 0.088), t2, f, (250, 246, 238, 236), 2.6)
-
-    # —— 左下: 姓名 / 副标题 / 日期 ——
+        w2 = d.textlength(spec["edition"], font=f) + 2.6 * max(0, len(spec["edition"]) - 1)
+        tracked(d, (W - RIM - 34 - w2, H * 0.088), spec["edition"], f, (250, 246, 238, 236), 2.6)
     x0 = RIM + 34
     if spec["name"]:
         size = 96
@@ -718,14 +724,24 @@ def render_portrait(im, dna, occ, spec, out_path=None):
         fdt = fnt(spec["date"], 20, "sans")
         tracked(d, (x0 + 2, H * 0.930 + 2), spec["date"], fdt, (0, 0, 0, 130), 3.2)
         tracked(d, (x0, H * 0.930), spec["date"], fdt, faint, 3.2)
+    composed.alpha_composite(txt)
 
-    out = canvas.convert("RGB")
+    # ---------- 9. 输出 ----------
+    if layers_dir:
+        ld = Path(layers_dir)
+        ld.mkdir(parents=True, exist_ok=True)
+        base.save(ld / "background.png")
+        fx.save(ld / "effects.png")
+        txt.save(ld / "text.png")
+        Image.new("RGBA", (W, H), (0, 0, 0, 0)).save(ld / "subject.png")
+        spec["layers_dir"] = str(ld)
+    out = composed.convert("RGB")
     if out_path:
         out.save(out_path)
         return out_path
     return out
 
-def build(photo_path, info, lang="editorial", out_dir="dl2/out"):
+def build(photo_path, info, lang="editorial", out_dir="dl2/out", layers_dir=None):
     path = Path(photo_path)
     dna, _ = photodna.analyze(path)
     im = photodna.orient.load_upright(path)
@@ -747,7 +763,10 @@ def build(photo_path, info, lang="editorial", out_dir="dl2/out"):
         render = render_editorial
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     out = Path(out_dir) / f"{path.stem}-{lang}.png"
-    render(im, dna, occ, spec, out)
+    try:
+        render(im, dna, occ, spec, out, layers_dir=layers_dir)
+    except TypeError:
+        render(im, dna, occ, spec, out)
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     (Path(out_dir) / f"{path.stem}-{lang}.json").write_text(
         json.dumps({k: spec[k] for k in spec if k != "palette"} |
