@@ -663,18 +663,32 @@ function showView(id, mode) {
   if (!is3d) note("");
   if (is3d) {
     const f = $("viewer");
-    note("正在加载 3D…(若长时间无反应会自动切回静态图)");
+    note("正在加载 3D…");
     if (f.dataset.id !== id) { f.dataset.id = id; f.src = "/p/" + id + "/"; }
     setTimeout(embedify, 400);
-    // 3D 就绪检测: 8 秒内没 ready 就回退到静态图, 保证预览区一定有东西
-    readyTimer = setTimeout(() => {
+    // 就绪检测(只提示, 绝不自动切模式): __holo.ready / 已出现 canvas 或 .flipper3d / 仍在加载
+    let tries = 12;
+    const check3d = () => {
       const h = holo();
       if (h && h.ready) { note("可拖动旋转 · 右上「翻转/自动/重置」"); setTimeout(() => note(""), 2500); return; }
-      note("3D 未就绪, 已切到静态图(可点「↗ 在新窗口打开」看 3D)");
-      $("viewModes").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.m === "static"));
-      viewMode = "static";
-      showView(id, "static");
-    }, 8000);
+      let domOk = false, loading = false, failed = false;
+      try {
+        const d = f.contentDocument;
+        if (d) {
+          domOk = !!(d.querySelector("canvas") || d.querySelector(".flipper3d") || d.querySelector(".layer3d"));
+          loading = d.readyState !== "complete";
+          const t = d.body ? (d.body.innerText || "").slice(0, 240) : "";
+          failed = /无法加载|is not defined|Error/i.test(t);
+        }
+      } catch (e) { /* 跨域时忽略 */ }
+      if (domOk || loading) {
+        if (tries-- > 0) { readyTimer = setTimeout(check3d, 2000); return; }
+      }
+      note(failed ? "3D 页面报错: 可点右上「↗ 在新窗口打开」查看原因"
+                  : "3D 加载较慢, 仍可拖动试试; 或点「↗ 在新窗口打开」");
+      setTimeout(() => note(""), 6000);
+    };
+    readyTimer = setTimeout(check3d, 2500);
   }
   if (mode === "static") $("staticView").src = "/cardimg/" + id + "/static.png?t=" + Date.now();
   if (mode === "back") $("backView").src = "/cardimg/" + id + "/static-back.png?t=" + Date.now();
