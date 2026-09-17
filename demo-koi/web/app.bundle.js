@@ -30760,330 +30760,7 @@ function addPrimitiveAttributes(geometry, primitiveDef, parser) {
   });
 }
 
-// demo-koi/web/icons.data.js
-var ICON_TREES = {
-  "Info": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "circle",
-        {
-          "cx": "12",
-          "cy": "12",
-          "r": "10"
-        }
-      ],
-      [
-        "path",
-        {
-          "d": "M12 16v-4"
-        }
-      ],
-      [
-        "path",
-        {
-          "d": "M12 8h.01"
-        }
-      ]
-    ]
-  ],
-  "Download": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "path",
-        {
-          "d": "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-        }
-      ],
-      [
-        "polyline",
-        {
-          "points": "7 10 12 15 17 10"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "12",
-          "x2": "12",
-          "y1": "15",
-          "y2": "3"
-        }
-      ]
-    ]
-  ],
-  "Play": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "polygon",
-        {
-          "points": "6 3 20 12 6 21 6 3"
-        }
-      ]
-    ]
-  ],
-  "Pause": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "rect",
-        {
-          "x": "14",
-          "y": "4",
-          "width": "4",
-          "height": "16",
-          "rx": "1"
-        }
-      ],
-      [
-        "rect",
-        {
-          "x": "6",
-          "y": "4",
-          "width": "4",
-          "height": "16",
-          "rx": "1"
-        }
-      ]
-    ]
-  ],
-  "Rotate3d": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "path",
-        {
-          "d": "M16.466 7.5C15.643 4.237 13.952 2 12 2 9.239 2 7 6.477 7 12s2.239 10 5 10c.342 0 .677-.069 1-.2"
-        }
-      ],
-      [
-        "path",
-        {
-          "d": "m15.194 13.707 3.814 1.86-1.86 3.814"
-        }
-      ],
-      [
-        "path",
-        {
-          "d": "M19 15.57c-1.804.885-4.274 1.43-7 1.43-5.523 0-10-2.239-10-5s4.477-5 10-5c4.838 0 8.873 1.718 9.8 4"
-        }
-      ]
-    ]
-  ],
-  "RotateCcw": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "path",
-        {
-          "d": "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
-        }
-      ],
-      [
-        "path",
-        {
-          "d": "M3 3v5h5"
-        }
-      ]
-    ]
-  ],
-  "SlidersHorizontal": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "line",
-        {
-          "x1": "21",
-          "x2": "14",
-          "y1": "4",
-          "y2": "4"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "10",
-          "x2": "3",
-          "y1": "4",
-          "y2": "4"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "21",
-          "x2": "12",
-          "y1": "12",
-          "y2": "12"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "8",
-          "x2": "3",
-          "y1": "12",
-          "y2": "12"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "21",
-          "x2": "16",
-          "y1": "20",
-          "y2": "20"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "12",
-          "x2": "3",
-          "y1": "20",
-          "y2": "20"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "14",
-          "x2": "14",
-          "y1": "2",
-          "y2": "6"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "8",
-          "x2": "8",
-          "y1": "10",
-          "y2": "14"
-        }
-      ],
-      [
-        "line",
-        {
-          "x1": "16",
-          "x2": "16",
-          "y1": "18",
-          "y2": "22"
-        }
-      ]
-    ]
-  ],
-  "X": [
-    "svg",
-    {
-      "xmlns": "http://www.w3.org/2000/svg",
-      "width": 24,
-      "height": 24,
-      "viewBox": "0 0 24 24",
-      "fill": "none",
-      "stroke": "currentColor",
-      "stroke-width": 2,
-      "stroke-linecap": "round",
-      "stroke-linejoin": "round"
-    },
-    [
-      [
-        "path",
-        {
-          "d": "M18 6 6 18"
-        }
-      ],
-      [
-        "path",
-        {
-          "d": "m6 6 12 12"
-        }
-      ]
-    ]
-  ]
-};
-
 // demo-koi/web/app.js
-var icons = ICON_TREES;
 var $ = (id) => document.getElementById(id);
 var stage = $("stage");
 var media = matchMedia("(prefers-reduced-motion: reduce)");
@@ -31315,37 +30992,38 @@ function backTexture() {
   c.width = 1024;
   c.height = 1536;
   const ctx = c.getContext("2d");
-  const S = {
-    celebration: { bg1: "#fbf6ec", bg2: "#f6ecda", ink: "#3a342c", gold: "#c4964a", a1: "#e8796a", a2: "#f6d27a", frame: "thin" },
-    soft: { bg1: "#f7f2ea", bg2: "#efe7da", ink: "#5b5248", gold: "#d8c3a0", a1: "#e8d2ce", a2: "#d8c3a0", frame: "double" },
-    pop: { bg1: "#fffdf6", bg2: "#fff8e6", ink: "#141414", gold: "#ffd400", a1: "#2b4cff", a2: "#ff4b3e", frame: "bold" },
-    night: { bg1: "#0e1526", bg2: "#070a12", ink: "#f0e8d6", gold: "#dec9a0", a1: "#a8874f", a2: "#d9a6a0", frame: "double" },
-    diorama: { bg1: "#0c1424", bg2: "#05070d", ink: "#f2e8d5", gold: "#e8c98a", a1: "#a8763a", a2: "#c4523f", frame: "double" }
-  }[config.backStyle || "night"];
-  const dark = ["night", "diorama"].includes(config.backStyle || "night");
-  const star = (x, y, r, alpha) => {
-    const k = 0.22;
+  const gold = "rgb(222,201,160)", cream = "rgb(240,236,228)", faint = "rgba(230,224,212,.72)";
+  const g = ctx.createLinearGradient(0, 0, 0, 1536);
+  g.addColorStop(0, "#0c0d11");
+  g.addColorStop(0.45, "#111218");
+  g.addColorStop(1, "#0a0b0f");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1024, 1536);
+  const rg = ctx.createRadialGradient(512, 690, 140, 512, 690, 940);
+  rg.addColorStop(0, "rgba(255,255,255,.045)");
+  rg.addColorStop(1, "rgba(0,0,0,.55)");
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, 1024, 1536);
+  ctx.strokeStyle = "rgba(222,201,160,.26)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(34.5, 34.5, 1024 - 69, 1536 - 69);
+  ctx.strokeStyle = "rgba(222,201,160,.40)";
+  [[34.5, 34.5, 1, 1], [989.5, 34.5, -1, 1], [34.5, 1501.5, 1, -1], [989.5, 1501.5, -1, -1]].forEach(function(p) {
     ctx.beginPath();
-    ctx.moveTo(x, y - r);
-    ctx.lineTo(x + r * k, y - r * k);
-    ctx.lineTo(x + r, y);
-    ctx.lineTo(x + r * k, y + r * k);
-    ctx.lineTo(x, y + r);
-    ctx.lineTo(x - r * k, y + r * k);
-    ctx.lineTo(x - r, y);
-    ctx.lineTo(x - r * k, y - r * k);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(" + alpha + ")";
-    ctx.fill();
-  };
-  const tracked = (text, cx, y, fnt, tracking, color) => {
+    ctx.moveTo(p[0], p[1]);
+    ctx.lineTo(p[0] + p[2] * 34, p[1]);
+    ctx.moveTo(p[0], p[1]);
+    ctx.lineTo(p[0], p[1] + p[3] * 34);
+    ctx.stroke();
+  });
+  const tracked = (text, cx, y2, fnt, tracking, color) => {
     ctx.font = fnt;
     ctx.fillStyle = color;
     const chars = [...String(text)];
     const w = chars.reduce((s, ch) => s + ctx.measureText(ch).width, 0) + tracking * (chars.length - 1);
     let x = cx - w / 2;
     for (const ch of chars) {
-      ctx.fillText(ch, x, y);
+      ctx.fillText(ch, x, y2);
       x += ctx.measureText(ch).width + tracking;
     }
   };
@@ -31354,146 +31032,90 @@ function backTexture() {
     const fontOf = (px) => (weight ? weight + " " : "") + px + "px " + fam;
     const wid = (str, px) => {
       ctx.font = fontOf(px);
-      const n = [...str].length;
-      return ctx.measureText(str).width + tracking * Math.max(0, n - 1);
+      return ctx.measureText(str).width + tracking * Math.max(0, [...str].length - 1);
     };
     while (sz > (minSize || 12) && wid(t, sz) > maxW) sz -= 1;
     const full = t;
     while (t.length > 3 && wid(t + "…", sz) > maxW) t = t.slice(0, -1);
     return { font: fontOf(sz), text: t === full ? t : t + "…" };
   };
-  const field = (label, y, value) => {
-    if (!value) return;
-    tracked(label, 512, y, "12px 'Segoe UI', Arial", 3.2, "rgba(" + (S.frame === "bold" ? "20,20,20,.62" : "139,132,116,.92") + ")");
-    tracked(value, 512, y + 30, "17px 'Segoe UI', Arial", 1, "rgba(" + (dark ? "232,217,181,.94" : "58,52,44,.9") + ")");
-  };
-  const g = ctx.createLinearGradient(0, 0, 0, 1536);
-  g.addColorStop(0, S.bg1);
-  g.addColorStop(1, S.bg2);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 1024, 1536);
-  if (config.backStyle === "pop") {
-    ctx.fillStyle = S.a1;
-    ctx.fillRect(0, 1330, 1024, 206);
-    ctx.fillStyle = S.gold;
-    ctx.fillRect(0, 0, 1024, 46);
-    ctx.fillStyle = S.a2;
-    ctx.fillRect(740, 46, 284, 18);
-  } else if (config.backStyle === "celebration") {
-    const rg = ctx.createRadialGradient(190, 220, 20, 190, 220, 430);
-    rg.addColorStop(0, "rgba(246,210,122,.55)");
-    rg.addColorStop(1, "rgba(246,210,122,0)");
-    ctx.fillStyle = rg;
-    ctx.fillRect(0, 0, 1024, 900);
-    const rg2 = ctx.createRadialGradient(870, 1240, 20, 870, 1240, 420);
-    rg2.addColorStop(0, "rgba(232,121,106,.38)");
-    rg2.addColorStop(1, "rgba(232,121,106,0)");
-    ctx.fillStyle = rg2;
-    ctx.fillRect(400, 800, 624, 736);
-  } else if (dark) {
-    ctx.globalAlpha = 0.055;
-    for (let i = 0; i < 150; i++) {
-      const y = Math.random() * 1536;
-      ctx.strokeStyle = i % 2 ? "#8fa2c4" : "#c9b184";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * 600, y);
-      ctx.lineTo(Math.random() * 400 + 300, y);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-    ctx.beginPath();
-    ctx.arc(512, 760, 300, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(222,201,160,.07)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  const SERIF = "'Palatino Linotype', 'Microsoft YaHei', Georgia, serif";
+  const SANS = "'Segoe UI', 'Microsoft YaHei', Arial, sans-serif";
+  const SCRIPT = "'Segoe Script', Inkfree, 'Microsoft YaHei', cursive";
+  let y = 268;
+  if (config.edition) {
+    const t = fitText(config.edition, "", SERIF, 38, 620, 3.4, 16);
+    tracked(t.text, 512, y, t.font, 3.4, gold);
   }
-  if (S.frame === "bold") {
-    ctx.strokeStyle = S.ink;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(26, 26, 972, 1484);
-  } else if (S.frame === "thin") {
-    ctx.strokeStyle = "rgba(58,52,44,.85)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, 964, 1476);
-    star(62, 62, 8, "232,121,106,.9");
-    star(962, 1474, 8, "246,210,122,.95");
-  } else {
-    ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.80" : "216,195,160,.95") + ")";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(38, 38, 948, 1460);
-    ctx.strokeStyle = "rgba(" + (dark ? "168,135,79,.50" : "216,195,160,.7") + ")";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(56, 56, 912, 1424);
-    [[86, 86], [938, 86], [86, 1450], [938, 1450]].forEach(([x, y]) => star(x, y, 7, "222,201,160,.78"));
-  }
-  const inkC = S.ink, goldC = S.gold;
-  tracked(config.edition || "", 512, 312, "20px 'Segoe UI', Arial", 2.4, goldC);
-  ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.35" : "58,52,44,.28") + ")";
+  y += 46;
+  ctx.strokeStyle = "rgba(222,201,160,.28)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(432, 348);
-  ctx.lineTo(592, 348);
+  ctx.moveTo(512 - 92, y);
+  ctx.lineTo(512 + 92, y);
   ctx.stroke();
-  const age = String(config.age || "").trim();
-  if (age) {
-    ctx.fillStyle = dark ? "rgba(222,201,160,.085)" : config.backStyle === "pop" ? "rgba(20,20,20,.07)" : config.backStyle === "celebration" ? "rgba(232,121,106,.12)" : "rgba(216,195,160,.22)";
-    ctx.font = config.backStyle === "pop" ? "300px Bahnschrift, Arial Black" : "320px Palatino Linotype, Georgia, serif";
+  if (config.technique) {
+    const t = fitText(config.technique, "", SANS, 21, 560, 2.6, 12);
+    tracked(t.text, 512, y + 34, t.font, 2.6, "rgba(240,236,228,.78)");
+  }
+  let script = String(config.collection || "Digital Collectible Card").trim();
+  if (script === script.toUpperCase()) {
+    script = script.split(/\s+/).map(function(w) {
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(" ");
+  }
+  if (script) {
+    let sz = script.length <= 24 ? 74 : 58;
+    ctx.font = sz + "px " + SCRIPT;
+    while (ctx.measureText(script).width > 660 && sz > 30) {
+      sz -= 2;
+      ctx.font = sz + "px " + SCRIPT;
+    }
+    ctx.fillStyle = "rgba(0,0,0,.5)";
     ctx.textAlign = "center";
-    ctx.fillText(age, 512, 880);
+    ctx.fillText(script, 514, 768 + 2);
+    ctx.fillStyle = "rgba(222,201,160,.88)";
+    ctx.fillText(script, 512, 768);
     ctx.textAlign = "left";
   }
-  star(512, 940, 5, dark ? "222,201,160,.8" : "58,52,44,.5");
-  ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.40" : "58,52,44,.30") + ")";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(222,201,160,.20)";
   ctx.beginPath();
-  ctx.moveTo(392, 940);
-  ctx.lineTo(486, 940);
+  ctx.moveTo(512 - 150, 960);
+  ctx.lineTo(512 + 150, 960);
   ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(538, 940);
-  ctx.lineTo(632, 940);
-  ctx.stroke();
-  if (config.tagline) tracked(config.tagline, 512, 982, "16px 'Segoe UI', Arial", 5.5, "rgba(" + (dark ? "222,201,160,.6" : "58,52,44,.62") + ")");
-  ctx.strokeStyle = "rgba(" + (dark ? "222,201,160,.28" : "58,52,44,.22") + ")";
-  ctx.beginPath();
-  ctx.moveTo(372, 1104);
-  ctx.lineTo(652, 1104);
-  ctx.stroke();
-  const hasQr = !!(config.qr && config.qr.enabled && Array.isArray(config.qr.matrix));
-  const safeW = hasQr ? 560 : 780;
-  if (config.name) {
-    const t = fitText(String(config.name).toUpperCase(), "600", "'Segoe UI', 'Microsoft YaHei', Arial", 17, safeW, 3.4, 12);
-    tracked(t.text, 512, 1148, t.font, 3.4, inkC);
+  const created = String(config.createdBy || "").replace(/^@/, "");
+  const owned = String(config.ownedBy || "").replace(/^@/, "");
+  if (created) {
+    const t = fitText("Created by @" + created, "", SANS, 16, 340, 2.2, 11);
+    tracked(t.text, 512 * 0.56, 1020, t.font, 2.2, "rgba(240,236,228,.68)");
   }
-  if (config.technique) {
-    const t = fitText(config.technique, "", "'Segoe UI', 'Microsoft YaHei', Arial", 23, safeW, 2, 12);
-    tracked(t.text, 512, 1204, t.font, 2, goldC);
+  if (owned) {
+    const t = fitText("Owned by @" + owned, "", SANS, 16, 340, 2.2, 11);
+    tracked(t.text, 512 * 1.44, 1020, t.font, 2.2, "rgba(240,236,228,.68)");
   }
-  if (config.wish) {
-    const t = fitText(config.wish, "", "'Palatino Linotype', 'Microsoft YaHei', Georgia, serif", 21, safeW, 0.6, 12);
-    tracked(t.text, 512, 1256, t.font, 0.6, "rgba(" + (dark ? "214,200,168,.78" : "58,52,44,.70") + ")");
-  }
-  const meta2 = [];
-  if (config.createdBy) meta2.push("CREATED BY " + String(config.createdBy).toUpperCase());
-  if (config.ownedBy) meta2.push("OWNED BY " + String(config.ownedBy).toUpperCase());
-  if (meta2.length) {
-    const t = fitText(meta2.join("  ·  "), "", "'Segoe UI', 'Microsoft YaHei', Arial", 13, safeW, 2.6, 11);
-    tracked(t.text, 512, 1320, t.font, 2.6, "rgba(" + (dark ? "222,201,160,.62" : "58,52,44,.62") + ")");
+  const qr = config.qr || {};
+  if (qr.enabled && Array.isArray(qr.matrix) && qr.matrix.length) {
+    const m = qr.matrix, n = m.length, side = 164, pad = 12;
+    const x0 = Math.round(512 - side / 2), y0 = Math.round(1536 * 0.735);
+    ctx.fillStyle = "rgba(255,255,255,.94)";
+    ctx.beginPath();
+    const r = 10;
+    ctx.moveTo(x0 - pad + r, y0 - pad);
+    ctx.arcTo(x0 + side + pad, y0 - pad, x0 + side + pad, y0 + side + pad, r);
+    ctx.arcTo(x0 + side + pad, y0 + side + pad, x0 - pad, y0 + side + pad, r);
+    ctx.arcTo(x0 - pad, y0 + side + pad, x0 - pad, y0 - pad, r);
+    ctx.arcTo(x0 - pad, y0 - pad, x0 + side + pad, y0 - pad, r);
+    ctx.closePath();
+    ctx.fill();
+    const cell = side / n;
+    ctx.fillStyle = "rgb(12,12,14)";
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (m[i][j]) ctx.fillRect(x0 + j * cell, y0 + i * cell, Math.ceil(cell), Math.ceil(cell));
+      }
+    }
   }
   return canvasTexture(c);
-}
-function refreshIcons() {
-  const overrides = { "stroke-width": 1.5 };
-  document.querySelectorAll("[data-lucide]").forEach((el) => {
-    const name = el.getAttribute("data-lucide");
-    const pascal = name.replace(/(^|-)([a-z0-9])/g, (_m, _p, c) => c.toUpperCase());
-    const tree = icons[name] || icons[pascal];
-    if (!tree) return;
-    const [tag, defaults = {}, children = []] = tree;
-    const svg = renderIconNode([tag, { ...defaults, ...overrides }, children]);
-    el.replaceChildren(svg);
-  });
 }
 function addShadow() {
   const c = document.createElement("canvas");
@@ -31516,13 +31138,6 @@ function addShadow() {
   );
   shadow.position.set(0.28, -0.48, -0.5);
   scene.add(shadow);
-}
-function renderIconNode(node) {
-  const [tag, attrs = {}, children = []] = node;
-  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
-  for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
-  for (const child of children) el.appendChild(renderIconNode(child));
-  return el;
 }
 function notice(message) {
   clearTimeout(noticeTimer);
