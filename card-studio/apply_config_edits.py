@@ -18,7 +18,8 @@ sys.path.insert(0, str(HERE))
 import qr_util  # noqa: E402
 
 EDITABLE = ["title", "subtitle", "tagline", "technique", "edition", "wish",
-            "age", "name", "collection", "description", "qrUrl"]
+            "age", "name", "collection", "description", "qrUrl",
+            "createdBy", "ownedBy", "occasion"]
 # 结构型改动(字典/数值), 由进阶设置面板提交
 STRUCT = ["appearance", "material", "parameters", "layout"]
 TEMPLATES = ("celebration", "soft", "pop", "night", "diorama")
@@ -107,7 +108,8 @@ def main():
     lang = str(cfg.get("designLanguage") or "").strip()
     is_v2 = bool(lang) or tpl == "v2"
     if is_v2:
-        text_keys = {"name", "title", "subtitle", "technique", "edition", "date"}
+        text_keys = {"name", "title", "subtitle", "technique", "edition", "date",
+                     "createdBy", "ownedBy", "qrUrl"}   # 归属/二维码影响背面 → 需重出
         # 视觉参数(围边/字号/暗垫…)会改变成图 → 必须重出; 材质/景深只影响 3D → 不重出
         look_keys = {"rimWidth", "rimBright", "feather", "rimShadow", "scrim", "topPad",
                      "nameSize", "dateSize", "clarityPct"}

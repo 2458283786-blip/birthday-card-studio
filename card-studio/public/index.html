@@ -198,6 +198,16 @@
           <div><label>纪念日期</label><input id="v2_date" placeholder="2026.09.16" /></div>
           <div class="full"><label>客户文案</label><input id="v2_msg" placeholder="客户原话 / 祝福语" /></div>
           <div class="full"><label>备注(仅内部)</label><input id="v2_note" placeholder="工作台内部备注" /></div>
+          <div class="full"><label>纪念场合</label>
+            <div class="chips" id="v2_occasion">
+              <div class="chip" data-v="birthday">生日</div>
+              <div class="chip" data-v="anniversary">纪念日</div>
+              <div class="chip" data-v="travel">旅行</div>
+              <div class="chip" data-v="graduation">毕业</div>
+              <div class="chip" data-v="pet">宠物</div>
+              <div class="chip on" data-v="personal">个人</div>
+            </div>
+          </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
           <button class="btn" id="v2_order" style="height:34px;padding:0 16px;font-size:13px">建立订单</button>
@@ -247,6 +257,16 @@
         <div class="slider"><span>背景</span><input type="range" id="v2d_bg" min="-0.8" max="0.2" step="0.02"><b id="v2v_bg"></b></div>
         <div class="slider"><span>前景</span><input type="range" id="v2d_fx" min="0" max="1.4" step="0.02"><b id="v2v_fx"></b></div>
         <div class="slider"><span>文字</span><input type="range" id="v2d_tx" min="0" max="1.2" step="0.02"><b id="v2v_tx"></b></div>
+        <label style="margin-top:14px">卡背身份字段(可选, 留空则不出现)</label>
+        <div class="grid">
+          <div><label>创作者(显示 Created by @…)</label><input id="v2_creator" placeholder="如 chen(不用写@)" /></div>
+          <div><label>拥有者(显示 Owned by @…)</label><input id="v2_owner" placeholder="如 feng" /></div>
+          <div class="full"><label>二维码链接(印在背面, 留空不显示)</label><input id="v2_qrurl" placeholder="https://…" /></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button class="mini" id="v2_saveIdentity">保存身份字段并重出背面</button>
+          <span class="muted" id="v2_idState"></span>
+        </div>
         <label style="margin-top:14px">视觉参数(改完点「应用并重出卡面」)</label>
         <div class="slider"><span>围边宽度</span><input type="range" id="vd_rim" min="0" max="70" step="2"><b id="vv_rim"></b></div>
         <div class="slider"><span>围边亮度</span><input type="range" id="vd_bright" min="0" max="0.8" step="0.02"><b id="vv_bright"></b></div>
@@ -981,7 +1001,9 @@ async function v2Order() {
   try {
     const r = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageData: await blobToDataURL(chosen), name: val("v2_name"),
-                             date: val("v2_date"), message: val("v2_msg"), note: val("v2_note") }) });
+                             date: val("v2_date"), message: val("v2_msg"), note: val("v2_note"),
+                             occasion: v2occ, createdBy: val("v2_creator"),
+                             ownedBy: val("v2_owner"), qrUrl: val("v2_qrurl") }) });
     const d = await r.json();
     if (!r.ok || !d.ok) { $("v2_orderState").textContent = "建立失败"; toast("建立订单失败", true); return; }
     v2.id = d.id; v2.analysis = null; v2.proposals = null;
@@ -1073,6 +1095,7 @@ async function v2Adopt(lang, btn) {
     $("v2_qaCard").style.display = "block";
     await v2ShowEdit();
     await lookLoad();
+    await identityLoad();
     toast("已采用 " + String(lang).toUpperCase() + " 建卡");
     poll();
   } catch (e) { toast("建卡失败: " + e, true); if (btn) { btn.disabled = false; btn.textContent = "选它"; } }
@@ -1310,7 +1333,9 @@ $("v2_batch").onclick = async function () {
     for (const f of pending) imgs.push(await blobToDataURL(f));
     const r = await fetch("/api/batch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ images: imgs, name: val("v2_name"), date: val("v2_date"),
-                             message: val("v2_msg"), note: val("v2_note"), occasion: "personal" }) });
+                             message: val("v2_msg"), note: val("v2_note"), occasion: v2occ,
+                             createdBy: val("v2_creator"), ownedBy: val("v2_owner"),
+                             qrUrl: val("v2_qrurl") }) });
     const d = await r.json();
     if (!r.ok || !d.ok) { toast("批量提交失败", true); return; }
     window.__batchIds = d.ids || [];
@@ -1320,6 +1345,41 @@ $("v2_batch").onclick = async function () {
     poll();
   } catch (e) { toast("批量提交失败: " + e, true); }
   finally { btn.disabled = false; }
+};
+
+/* ---------------- 纪念场合 / 身份字段 ---------------- */
+let v2occ = "personal";
+document.querySelectorAll("#v2_occasion .chip").forEach(function (c) {
+  c.onclick = function () {
+    document.querySelectorAll("#v2_occasion .chip").forEach(function (x) { x.classList.remove("on"); });
+    c.classList.add("on");
+    v2occ = c.dataset.v;
+  };
+});
+async function identityLoad() {
+  try {
+    const c = await (await fetch("/api/config/" + v2.id)).json();
+    const f = c.fields || {};
+    if ($("v2_creator")) $("v2_creator").value = f.createdBy || "";
+    if ($("v2_owner")) $("v2_owner").value = f.ownedBy || "";
+    if ($("v2_qrurl")) $("v2_qrurl").value = f.qrUrl || "";
+  } catch (e) { /* 忽略 */ }
+}
+if ($("v2_saveIdentity")) $("v2_saveIdentity").onclick = async () => {
+  if (!v2.id) { toast("先建立订单并采用提案", true); return; }
+  $("v2_idState").textContent = "重出背面中…";
+  try {
+    const r = await fetch("/api/config/" + v2.id, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ createdBy: val("v2_creator"), ownedBy: val("v2_owner"),
+                             qrUrl: val("v2_qrurl") }) });
+    const d = await r.json().catch(function () { return {}; });
+    if (!r.ok || !d.ok) { $("v2_idState").textContent = "失败, 见日志"; return; }
+    $("v2_idState").textContent = "已重出 ✓";
+    const f = $("viewer");
+    if (f) f.dataset.id = "";
+    showView(v2.id, "3d");
+  } catch (e) { $("v2_idState").textContent = "失败: " + e; }
 };
 
 $("v2_order").onclick = v2Order;

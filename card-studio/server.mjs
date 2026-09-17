@@ -317,6 +317,9 @@ const server = http.createServer(async (req, res) => {
         name: String(raw.name || "").trim(),
         message: String(raw.message || "").trim(),
         note: String(raw.note || "").trim(),
+        createdBy: String(raw.createdBy || "").replace(/^@/, "").trim(),
+        ownedBy: String(raw.ownedBy || "").replace(/^@/, "").trim(),
+        qrUrl: String(raw.qrUrl || "").trim(),
         collection: "Digital Collectible",
         backStyle: "night",
         appearance: { finish: "gold", background: "#efece6" },
@@ -329,6 +332,10 @@ const server = http.createServer(async (req, res) => {
       const j = JSON.stringify(cfg, null, 2);
       await writeFile(path.join(dir, "card-config.json"), j, "utf8");
       await writeFile(path.join(dir, "web", "card-config.json"), j, "utf8");
+      if (cfg.qrUrl) {
+        await runPy([process.env.PY || "python", "-u", path.join(__dir, "attach_qr.py"), dir],
+                    ROOT, path.join(dir, "qr.log"), (l) => {});
+      }
       await writeFile(path.join(dir, "meta.json"), JSON.stringify({
         title: cfg.name || "未命名", edition, technique: cfg.technique, template: "v2",
         designLanguage: "", note: cfg.note,
@@ -365,6 +372,9 @@ const server = http.createServer(async (req, res) => {
           title: "", subtitle: "Personal Style", edition,
           technique: String(raw.date || "").trim(), name: String(raw.name || "").trim(),
           message: String(raw.message || "").trim(), note: String(raw.note || "").trim(),
+          createdBy: String(raw.createdBy || "").replace(/^@/, "").trim(),
+          ownedBy: String(raw.ownedBy || "").replace(/^@/, "").trim(),
+          qrUrl: String(raw.qrUrl || "").trim(),
           collection: "Digital Collectible", backStyle: "night",
           appearance: { finish: "gold", background: "#efece6" },
           material: { regions: { frame: "gloss", text: "gloss", subject: "matte", background: "matte" },
@@ -376,6 +386,10 @@ const server = http.createServer(async (req, res) => {
         const j = JSON.stringify(cfg, null, 2);
         await writeFile(path.join(dir, "card-config.json"), j, "utf8");
         await writeFile(path.join(dir, "web", "card-config.json"), j, "utf8");
+        if (cfg.qrUrl) {
+          await runPy([process.env.PY || "python", "-u", path.join(__dir, "attach_qr.py"), dir],
+                      ROOT, path.join(dir, "qr.log"), (l) => {});
+        }
         const meta = { title: cfg.name || "未命名", edition, technique: cfg.technique,
                        template: "v2", designLanguage: "", note: cfg.note };
         await writeFile(path.join(dir, "meta.json"), JSON.stringify(meta, null, 2), "utf8");
