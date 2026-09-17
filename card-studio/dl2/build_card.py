@@ -27,6 +27,29 @@ import render_previews as rp  # noqa: E402
 import qr_util  # noqa: E402
 
 
+
+def split_layers_by_diff(full_path, plain_path, layers_dir):
+    """两遍渲染差分: 生成 background / text / subject 三层(通用, 不需要改渲染器)。"""
+    from PIL import Image, ImageChops
+    import numpy as np
+    ld = Path(layers_dir)
+    ld.mkdir(parents=True, exist_ok=True)
+    full = Image.open(full_path).convert("RGB")
+    plain = Image.open(plain_path).convert("RGB")
+    if plain.size != full.size:
+        plain = plain.resize(full.size, Image.Resampling.LANCZOS)
+    a = np.asarray(full, np.float32)
+    b = np.asarray(plain, np.float32)
+    diff = np.abs(a - b).max(axis=2)                  # 每像素最大通道差
+    alpha = np.clip((diff - 6.0) / 40.0, 0, 1) * 255   # 小差忽略, 大差保留
+    txt = np.dstack([a, alpha]).astype(np.uint8)
+    plain.save(ld / "background.png")
+    Image.fromarray(txt, "RGBA").save(ld / "text.png")
+    Image.new("RGBA", full.size, (0, 0, 0, 0)).save(ld / "subject.png")
+    cov = float((alpha > 40).mean())
+    return cov
+
+
 def find_photo(project):
     for pat in ("_upload.*", "assets/source.png", "source.png"):
         hits = sorted(project.glob(pat))
@@ -55,10 +78,34 @@ def main():
     out_dir = proj / "assets"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # 清理上一次构建留下的分层(换语言时避免混入旧层)
+    for _d in (out_dir, web_assets):
+        for _n in ("background", "subject", "effects", "text"):
+            for _ext in (".png", ".webp"):
+                try:
+                    (_d / (_n + _ext)).unlink(missing_ok=True)
+                except Exception:
+                    pass
+
     # 1) 正面(有分层就输出分层)
     front, spec = design.build(str(photo), info, lang=a.lang, out_dir=str(out_dir),
                                layers_dir=str(out_dir))     # 分层 PNG 放项目 assets/(供导出/印刷)
     front = Path(front)
+    # 渲染器未产出分层(editorial/memory/cinema) → 两遍渲染差分补齐
+    if not (web_assets / "background.png").exists() and not (out_dir / "background.png").exists():
+        import shutil as _sh
+        tmp_full = out_dir / "_full_tmp.png"
+        _sh.copy2(front, tmp_full)
+        blank = {"name": "", "title": "", "subtitle": "", "edition": "",
+                 "technique": "", "date": ""}
+        plain_path, _spec2 = design.build(str(photo), blank, lang=a.lang, out_dir=str(out_dir))
+        cov = split_layers_by_diff(tmp_full, plain_path, out_dir)
+        try:
+            Path(plain_path).unlink(missing_ok=True)      # 第二遍渲染覆盖了同名文件
+        except Exception:
+            pass
+        front = tmp_full                                   # 后续统一用这份保留下来的原图
+        print(f"[建卡] 分层回退(两遍差分): 文字覆盖 {cov * 100:.2f}%")
     shutil.copy2(front, out_dir / "front.png")
     shutil.copy2(front, web_assets / "front.png")
     print(f"[建卡] 正面 = {a.lang} | 放大 {spec.get('upscale')}× {spec.get('quality_warning') or ''}")
@@ -124,6 +171,10 @@ def main():
             "technique": cfg.get("technique", ""), "template": a.lang,
             "designLanguage": a.lang, "note": cfg.get("note", "")}
     (proj / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf8")
+    try:
+        (out_dir / "_full_tmp.png").unlink(missing_ok=True)
+    except Exception:
+        pass
     print("[建卡] 分层:", ", ".join(layers) or "(无, 走平面兜底)")
     print("[建卡] 完成 →", proj)
     return 0
