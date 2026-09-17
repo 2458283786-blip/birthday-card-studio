@@ -14,6 +14,8 @@ import argparse
 import json
 import shutil
 import sys
+
+from PIL import Image
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -55,7 +57,7 @@ def main():
 
     # 1) 正面(有分层就输出分层)
     front, spec = design.build(str(photo), info, lang=a.lang, out_dir=str(out_dir),
-                               layers_dir=str(web_assets))
+                               layers_dir=str(out_dir))     # 分层 PNG 放项目 assets/(供导出/印刷)
     front = Path(front)
     shutil.copy2(front, out_dir / "front.png")
     shutil.copy2(front, web_assets / "front.png")
@@ -69,9 +71,29 @@ def main():
     rp.render_back(cfg.get("backStyle", "night"), cfg).convert("RGB").save(proj / "static-back.png")
 
     # 4) 配置: assets + 语言 + 深度
-    layers = {n: f"assets/{n}.png" for n in ("background", "subject", "effects", "text")
-              if (web_assets / f"{n}.png").exists()}
-    assets = {"model": "assets/card.glb", "front": "assets/front.png"}
+    def webpize(name, quality=82):
+        """从项目 assets/<name>.png 生成 web/assets/<name>.webp(首屏体积约 1/4)。"""
+        src = out_dir / f"{name}.png"
+        if not src.exists():
+            src = web_assets / f"{name}.png"
+        if not src.exists():
+            return None
+        dst = web_assets / f"{name}.webp"
+        try:
+            Image.open(src).save(dst, "WEBP", quality=quality, method=5)
+            return f"assets/{name}.webp"
+        except Exception as e:
+            print(f"[建卡] {name} webp 失败({type(e).__name__}), 回退 png")
+            if (web_assets / f"{name}.png").exists():
+                return f"assets/{name}.png"
+            return None
+
+    layers = {}
+    for n in ("background", "subject", "effects", "text"):
+        u = webpize(n)
+        if u:
+            layers[n] = u
+    assets = {"model": "assets/card.glb", "front": webpize("front", 88) or "assets/front.png"}
     assets.update(layers)
     cfg["assets"] = assets
     cfg["designLanguage"] = a.lang

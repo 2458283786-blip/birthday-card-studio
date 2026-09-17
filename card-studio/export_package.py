@@ -58,6 +58,12 @@ document.documentElement.setAttribute('data-showcase', '1');
 def flatten_front(project):
     """按 shader 的合成顺序把分层压成一张正片(天然光线, 不含 Holo)。"""
     a = project / "assets"
+    if not (a / "background.png").exists():
+        # V2 卡(单张正面图, 无分层) → 规范 fallback: 用 front.png / 静态卡面
+        for cand in (a / "front.png", project / "static.png"):
+            if cand.exists():
+                return Image.open(cand).convert("RGB")
+        raise RuntimeError("缺少正面素材(background.png / front.png 都没有)")
     bg = Image.open(a / "background.png").convert("RGBA")
     W, H = bg.size
     out = bg.convert("RGBA")
@@ -138,9 +144,9 @@ def main():
         back.save(pkg / "back.png")
 
     # 2) 预览图
-    front.resize((800, 1200), Image.Resampling.LANCZOS).save(pkg / "preview" / "front.jpg", quality=88)
+    front.resize((800, 1200), Image.Resampling.LANCZOS).convert("RGB").save(pkg / "preview" / "front.jpg", quality=88)
     if back is not None:
-        back.resize((800, 1200), Image.Resampling.LANCZOS).save(pkg / "preview" / "back.jpg", quality=88)
+        back.resize((800, 1200), Image.Resampling.LANCZOS).convert("RGB").save(pkg / "preview" / "back.jpg", quality=88)
 
     # 3) 分层(只放存在的)
     layers_map = {}

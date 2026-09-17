@@ -135,6 +135,12 @@
   .qa li{padding:3px 0;display:flex;gap:8px}
   .qa .yes{color:var(--green);font-weight:600}
   .qa .no{color:var(--clay)}
+  .libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;margin-top:10px}
+  .libcell{background:#fff;border:1px solid var(--line);border-radius:9px;overflow:hidden;cursor:pointer}
+  .libcell:hover{border-color:var(--clay)}
+  .libcell img{width:100%;display:block;aspect-ratio:2/3;object-fit:cover;background:#f2f0eb}
+  .libcell b{display:block;font-size:11.5px;padding:6px 7px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .libcell span{display:block;font-size:10px;color:var(--mut);padding:0 7px 7px}
   .swatches{display:flex;flex-wrap:wrap;gap:8px}
   .sw{width:44px;height:44px;border-radius:9px;border:2px solid transparent;cursor:pointer;position:relative;
       box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
@@ -167,6 +173,7 @@
   </div>
   <button class="tbtn" id="exportCenter">📦 导出中心</button>
   <button class="tbtn" id="histBtnTop">🗂 历史记录</button>
+  <button class="tbtn" id="libBtn">🖼 卡片库</button>
 </header>
 
 <main class="layout">
@@ -241,6 +248,7 @@
         <div class="slider"><span>文字</span><input type="range" id="v2d_tx" min="0" max="1.2" step="0.02"><b id="v2v_tx"></b></div>
         <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
           <button class="btn" id="v2_apply" style="height:34px;padding:0 16px;font-size:13px">应用到 3D 预览</button>
+          <button class="mini" id="v2_editText">✏️ 改文案(重出卡面)</button>
           <span class="muted" id="v2_applyState"></span>
         </div>
         <div class="muted" style="margin-top:6px">光泽/材质是 3D 表现层;静态卡面以「塑封围边」呈现</div>
@@ -402,6 +410,7 @@
 <div class="histBar" id="histBar"><b>▸ 历史记录(<span id="histCount">0</span>)</b>
   <span class="muted">点击展开 · 默认收起, 不占版面</span></div>
 <div class="histDrawer" id="histDrawer"></div>
+<div class="histDrawer" id="libGrid"></div>
 
 <dialog id="editDialog">
   <h3 id="editTitle" style="margin:0 0 12px;font-size:15px"></h3>
@@ -550,6 +559,7 @@ async function poll() {
   const done = list.filter((j) => j.status === "done");
   $("histCount").textContent = done.length;
   renderHistory(list);
+  if ($("libGrid") && $("libGrid").classList.contains("open")) renderLibrary();
   const me = currentJob ? list.find((j) => j.id === currentJob) : null;
   const active = list.filter((j) => j.status === "running" || j.status === "queued").pop();
   const watch = me || active;
@@ -1120,6 +1130,39 @@ async function v2ApplyLook() {
   } catch (e) { $("v2_applyState").textContent = "应用失败: " + e; }
 }
 if ($("v2_apply")) $("v2_apply").onclick = v2ApplyLook;
+if ($("v2_editText")) $("v2_editText").onclick = () => {
+  if (!v2.id) { toast("先建立订单并采用提案", true); return; }
+  openEditor(v2.id, $("curTitle").textContent);
+};
+
+/* ---------------- 卡片库(网格视图) ---------------- */
+function renderLibrary() {
+  const box = $("libGrid");
+  if (!box) return;
+  const done = (jobsCache || []).filter((j) => j.status === "done");
+  if (!done.length) { box.innerHTML = '<div class="muted">还没有成品卡</div>'; return; }
+  box.innerHTML = '<div class="libgrid">' + done.slice().reverse().map((j) => {
+    const nm = j.title && j.title !== "无题" ? j.title : "未命名";
+    return '<div class="libcell" data-id="' + j.id + '">' +
+      '<img src="/cardimg/' + j.id + '/static-preview.png?t=' + (j.last ? 1 : 2) + '" loading="lazy" alt="" />' +
+      '<b>' + esc(nm) + "</b><span>" + esc(j.edition || "") + "</span></div>";
+  }).join("") + "</div>";
+  box.querySelectorAll(".libcell").forEach((cell) => {
+    cell.onclick = () => {
+      const j = (jobsCache || []).find((x) => x.id === cell.dataset.id);
+      if (j) { selectJob(j); $("libGrid").classList.remove("open"); }
+    };
+  });
+}
+function toggleLibrary() {
+  const g = $("libGrid"), d = $("histDrawer");
+  const open = !g.classList.contains("open");
+  g.classList.toggle("open", open);
+  d.classList.remove("open");
+  if (open) renderLibrary();
+}
+if ($("libBtn")) $("libBtn").onclick = toggleLibrary;
+
 
 $("v2_order").onclick = v2Order;
 
