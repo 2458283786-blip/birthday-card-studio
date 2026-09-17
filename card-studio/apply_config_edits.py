@@ -103,6 +103,30 @@ def main():
     image = find_image(project)
     print(f"[编辑] 模板={tpl} 改动字段={changed or '无'} 图片={image.name if image else '缺失'}")
 
+    # ---- V2 卡: 走 dl2/build_card.py, 不用旧模板渲染器 ----
+    lang = str(cfg.get("designLanguage") or "").strip()
+    is_v2 = bool(lang) or tpl == "v2"
+    if is_v2:
+        text_keys = {"name", "title", "subtitle", "technique", "edition", "date"}
+        if not (text_keys & set(edits.keys())):
+            print("[编辑] V2 卡: 仅外观参数变化 → 只更新配置(秒回)")
+            return 0
+        if not lang:
+            lang = "portrait"
+        viewer = None
+        for cand in sorted((ROOT / "card-studio" / "projects").glob("card-*")):
+            if (cand / "web" / "index.html").exists():
+                viewer = cand
+                break
+        args = [sys.executable, "-u", str(HERE / "dl2" / "build_card.py"), str(project), "--lang", lang]
+        if viewer is not None:
+            args += ["--viewer-from", str(viewer)]
+        print(f"[编辑] V2 卡文本变化 → 按 {lang} 重出")
+        r = subprocess.run(args, cwd=str(ROOT))
+        subprocess.run([sys.executable, "-u", str(HERE / "make_static_card.py"), str(project)],
+                       cwd=str(ROOT), capture_output=True)
+        return r.returncode
+
     if tpl in ("celebration", "soft", "pop", "night", "diorama"):
         if not image:
             print("[错误] 找不到原始照片, 无法重画文字层")

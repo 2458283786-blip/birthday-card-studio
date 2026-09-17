@@ -38,6 +38,10 @@ def flatten(project):
     a = Path(project) / "assets"
     bg = a / "background.png"
     if not bg.exists():
+        # V2 卡(单张正面图, 无分层) → 规范 fallback: 直接用 front.png
+        front = a / "front.png"
+        if front.exists():
+            return load_layer(front).convert("RGB")
         raise RuntimeError(f"缺少底图: {bg}")
     out = load_layer(bg)
     for name in ("subject", "effects", "text"):

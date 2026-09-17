@@ -31150,15 +31150,24 @@ vec3 film(vec2 uv) {
     vec3 bright = vec3(1.00, .90, .60);
     return mix(deep, bright, hi * .7 + glint * .3);
   }
-  vec3 color = spectrum(phase);
-  return mix(color, vec3(dot(color,vec3(.2126,.7152,.0722))), step(.5,uFinish));
+  if (uFinish < 0.5) {
+    // 珠光: 高饱和彩虹色带(柔软、随角度流动)
+    vec3 c = spectrum(phase);
+    float band = .5 + .5 * sin((phase * 2.0) * 6.28318);
+    return clamp(mix(c, c * 1.18, band), 0.0, 1.35);
+  }
+  // 银: 冷色金属 + 亮线, 不做彩虹
+  float streak = pow(.5 + .5 * sin((uv.y * 2.6 + uv.x * .5 + uView.y * 1.1) * 6.28318), 6.0);
+  float lum = .78 + .18 * (0.5 + 0.5 * sin((uv.x * .9 + uv.y * .7) * 6.28318));
+  return vec3(lum * .98, lum * 1.0, lum * 1.06) + streak * .22;
 }
 float sweep(vec2 uv) {
   return pow(.5+.5*sin((uv.x*.72+uv.y*.45+uView.x*1.2+uView.y*.6)*6.283),10.);
 }
 vec3 pearlFilm(vec2 uv) {
   float phase = uv.x*.85 + uv.y*.55 + uView.x*1.5 - uView.y*.9;
-  return .74 + .17*cos(6.28318*(phase + vec3(0.,.33,.67)));
+  float band = .5 + .5 * sin(phase * 6.28318 * 1.4);
+  return .70 + .26 * cos(6.28318 * (phase + vec3(0., .33, .67))) + band * .06;
 }
 vec3 foilFilm(vec2 uv) {
   float phase = uv.x*.62 + uv.y*.38 + uView.x*2.2 - uView.y*1.3;
@@ -31215,7 +31224,7 @@ void main() {
   col = mix(col,fx.rgb,fx.a*(1.-uRelief)*uHasFx);
   // ---- 分区材质(边框 / 文字 / 主体 / 底纹) ----
   float tilt = clamp((length(uView.xy) - 0.12) * 3.2, 0.0, 1.0);
-  float gate = mix(0.15, 1.0, tilt);
+  float gate = mix(0.22, 1.0, tilt);
   float band = sweep(uv);
   float goldBoost = uFinish > 2.5 ? 1.7 : 1.0;
   float edge = 1.-smoothstep(.015,.06,min(min(uv.x,1.-uv.x),min(uv.y,1.-uv.y)));
