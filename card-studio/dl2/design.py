@@ -741,6 +741,159 @@ def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
         return out_path
     return out
 
+
+# ================================================================ CYBER
+def neon_from(dna):
+    """从照片主色推一个高饱和霓虹色(保持同色系, 不跳色)。"""
+    d = (dna["color"]["dominant"] or [{"rgb": [80, 160, 220]}])[0]["rgb"]
+    r, g, b = [c / 255.0 for c in d]
+    mx, mn = max(r, g, b), min(r, g, b)
+    if mx - mn < 0.06:                       # 近灰 → 给冷色霓虹
+        return (0.35, 0.85, 1.0)
+    # 提升饱和、压暗底色, 得到霓虹感的亮色
+    sat = 0.85
+    lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    r, g, b = [lum + (c - lum) / max(1e-3, (mx - mn)) * sat for c in (r, g, b)]
+    return (min(1.0, max(0.0, r)), min(1.0, max(0.0, g)), min(1.0, max(0.0, b)))
+
+
+def cyber_grade(im, dna):
+    """冷调 + 高对比 + 轻去饱和: 夜城/科技片味。"""
+    a = np.asarray(im).astype(np.float32)
+    lum = a[..., 0] * 0.2126 + a[..., 1] * 0.7152 + a[..., 2] * 0.0722
+    a = lum[..., None] + (a - lum[..., None]) * 0.82
+    a = (a - 127.5) * 1.14 + 127.5
+    a[..., 0] *= 0.94                        # 压红
+    a[..., 2] *= 1.10                        # 提蓝
+    h, w = a.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]
+    r = np.sqrt(((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2)
+    a *= (1.0 - np.clip((r - 0.34) / 0.95, 0, 1) ** 1.5 * 0.46)[..., None]
+    a += np.random.default_rng(23).normal(0, 2.2, a.shape)
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGB")
+
+
+def plan_cyber(im, dna, occ, info):
+    pal = palette(dna)
+    return {
+        "id": "C1", "lang": "cyber", "palette": pal,
+        "name": (info.get("name") or info.get("title") or "").strip(),
+        "subtitle": (info.get("subtitle") or "Cyber Edition").strip(),
+        "edition": (info.get("edition") or "").strip(),
+        "date": (info.get("technique") or info.get("date") or "").strip(),
+        "neon": neon_from(dna),
+        "photo": subject_crop_box(im, dna, W / H),
+    }
+
+
+def render_cyber(im, dna, occ, spec, out_path=None, layers_dir=None):
+    neon = spec["neon"]
+    nc = tuple(int(c * 255) for c in neon)
+    body = cyber_grade(im.crop(spec["photo"]).resize((W, H), Image.Resampling.LANCZOS), dna)
+
+    # ---------- background: 黑底 + 照片(压暗) + HUD 静态线 ----------
+    bg = Image.new("RGBA", (W, H), (6, 8, 12, 255))
+    g = np.linspace(0, 1, H)[:, None, None]
+    top = np.array([10, 14, 20], np.float32)[None, None]
+    bot = np.array([4, 5, 8], np.float32)[None, None]
+    bgm = np.repeat((top * (1 - g) + bot * g)[:, :1, :], W, axis=1)
+    bg = Image.fromarray(np.clip(bgm, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+
+    ph = 1120                                   # 照片带高度(HUD 压在上/下)
+    photo = body.resize((W, ph), Image.Resampling.LANCZOS)
+    layer = Image.new("RGBA", (W, ph), (0, 0, 0, 255))
+    layer.alpha_composite(photo.convert("RGBA"))
+    # 照片上下渐隐进黑底
+    m = np.ones((ph, W), np.float32)
+    for i in range(120):
+        v = i / 120.0
+        m[i, :] = np.minimum(m[i, :], v * 0.55 + 0.45)
+        m[ph - 1 - i, :] = np.minimum(m[ph - 1 - i, :], v * 0.75 + 0.25)
+    layer.putalpha(Image.fromarray((m * 255).astype(np.uint8), "L"))
+    bg.alpha_composite(layer, (0, 150))
+
+    d = ImageDraw.Draw(bg, "RGBA")
+    # 扫描线
+    for y in range(0, H, 4):
+        d.line([(0, y), (W, y)], fill=(255, 255, 255, 8))
+    # 网格(HUD 底纹)
+    for x in range(0, W, 64):
+        d.line([(x, 0), (x, H)], fill=nc + (16,))
+    for y in range(0, H, 64):
+        d.line([(0, y), (W, y)], fill=nc + (14,))
+    # 角标 + 边线
+    L = 54
+    for (x, y, sx, sy) in [(28, 28, 1, 1), (W - 29, 28, -1, 1), (28, H - 29, 1, -1), (W - 29, H - 29, -1, -1)]:
+        d.line([(x, y), (x + sx * L, y)], fill=nc + (220,), width=2)
+        d.line([(x, y), (x, y + sy * L)], fill=nc + (220,), width=2)
+    d.rectangle([28, 28, W - 29, H - 29], outline=nc + (54,), width=1)
+    # 上方信息条
+    d.rectangle([28, 28, W - 29, 92], fill=nc + (26,))
+    d.line([(28, 92), (W - 29, 92)], fill=nc + (150,), width=1)
+    if spec["edition"]:
+        f = fnt(spec["edition"], 30, "sansb")
+        tracked(d, (58, 46), spec["edition"], f, nc + (245,), 3.0)
+    if spec["date"]:
+        f2 = fnt(spec["date"], 24, "sans")
+        w2 = d.textlength(spec["date"], font=f2) + 2.4 * max(0, len(spec["date"]) - 1)
+        tracked(d, (W - 58 - w2, 50), spec["date"], f2, (226, 236, 244, 220), 2.4)
+    # 底部刻度尺
+    for i in range(0, 41):
+        x = 28 + i * (W - 57) / 40.0
+        hgt = 12 if i % 5 == 0 else 6
+        d.line([(x, H - 120), (x, H - 120 + hgt)], fill=nc + (170,), width=1)
+    d.line([(28, H - 108), (W - 29, H - 108)], fill=nc + (90,), width=1)
+
+    # ---------- effects: 霓虹辉光 + 扫描带(强视差) ----------
+    fx = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    fd = ImageDraw.Draw(fx)
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([-int(W * 0.3), int(H * 0.30), int(W * 0.5), int(H * 0.78)], fill=nc + (70,))
+    gd.ellipse([int(W * 0.6), int(H * 0.05), int(W * 1.3), int(H * 0.45)],
+               fill=tuple(min(255, int(c * 0.7 + 90)) for c in nc) + (60,))
+    fx.alpha_composite(glow.filter(ImageFilter.GaussianBlur(90)))
+    for y in range(150, 150 + 1120, 26):
+        fd.line([(0, y), (W, y)], fill=nc + (26,))
+    fd.rectangle([0, 600, W, 616], fill=nc + (36,))
+
+    # ---------- text: 名称 + 副标题 ----------
+    txt = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    td = ImageDraw.Draw(txt, "RGBA")
+    base_y = 150 + 1120 - 96
+    if spec["name"]:
+        size = 88
+        f = fnt(spec["name"], size, "sansb")
+        while d.textlength(spec["name"], font=f) > W - 120 and size > 40:
+            size -= 3
+            f = fnt(spec["name"], size, "sansb")
+        td.text((62, base_y + 3), spec["name"], font=f, fill=(0, 0, 0, 190))
+        td.text((60, base_y), spec["name"], font=f, fill=(240, 248, 255, 255))
+        td.line([(60, base_y + size * 0.42), (60 + d.textlength(spec["name"], font=f),
+                                             base_y + size * 0.42)], fill=nc + (220,), width=3)
+    if spec["subtitle"]:
+        tracked(td, (62, base_y + 54), spec["subtitle"].upper(), fnt(spec["subtitle"], 22, "sansb"),
+                nc + (232,), 5.0)
+
+    composed = bg.copy()
+    composed.alpha_composite(fx)
+    composed.alpha_composite(txt)
+
+    if layers_dir:
+        ld = Path(layers_dir)
+        ld.mkdir(parents=True, exist_ok=True)
+        bg.save(ld / "background.png")
+        fx.save(ld / "effects.png")
+        txt.save(ld / "text.png")
+        Image.new("RGBA", (W, H), (0, 0, 0, 0)).save(ld / "subject.png")
+
+    out = composed.convert("RGB")
+    if out_path:
+        out.save(out_path)
+        return out_path
+    return out
+
+
 def build(photo_path, info, lang="editorial", out_dir="dl2/out", layers_dir=None):
     path = Path(photo_path)
     dna, _ = photodna.analyze(path)
@@ -755,6 +908,9 @@ def build(photo_path, info, lang="editorial", out_dir="dl2/out", layers_dir=None
     elif lang == "portrait":
         spec = plan_portrait(im, dna, occ, info)
         render = render_portrait
+    elif lang == "cyber":
+        spec = plan_cyber(im, dna, occ, info)
+        render = render_cyber
     elif lang == "memory":
         spec = plan_memory(im, dna, occ, info)
         render = render_memory
