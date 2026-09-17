@@ -14,7 +14,7 @@ import uuid
 from datetime import date
 from pathlib import Path
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"          # V2: 输出为 **超集**(v1 字段全部保留, 旧包/小程序继续可用)
 
 
 def _date_str(v):
@@ -83,6 +83,10 @@ def build_card_json(project, card_id, internal_id=None, theme="birthday", templa
         v = cfg.get(key)
         return str(v).strip() if v not in (None, "") else ""
 
+    occasion = str(cfg.get("occasion") or theme or "personal").strip()
+    design_lang = str(cfg.get("designLanguage") or "").strip()
+    note = s("note")
+
     layers = layers or {}
     data = {
         "schemaVersion": SCHEMA_VERSION,
@@ -90,6 +94,8 @@ def build_card_json(project, card_id, internal_id=None, theme="birthday", templa
         "displayId": display,                # 展示 ID(CARD #0001)
         "internalId": internal_id or (uuid.uuid4().hex[:16]),   # 内部不可预测 ID
         "theme": theme,
+        "occasion": occasion,                     # V2: 纪念场合(birthday/anniversary/travel/...)
+        "designLanguage": (design_lang or None),  # V2: 设计语言(portrait/cyber/editorial/memory)
         "template": f"birthday-{tpl}" if theme == "birthday" else tpl,
         # 正面字段属于 Artwork 内容; 没有就是 null(不虚构、不占位)
         "title": s("title") or None,
@@ -100,9 +106,10 @@ def build_card_json(project, card_id, internal_id=None, theme="birthday", templa
         "content": {
             "age": s("age") or None,
             "subtitle": s("subtitle") or None,
-            "message": s("wish") or None,
+            "message": s("wish") or s("message") or None,   # V2 用 message(兼容旧 wish)
             "signature": s("tagline") or None,
             "name": s("name") or None,
+            "note": (note or None),                          # V2: 客户备注
         },
         "front": {"image": "front.png"},
         "back": {"image": "back.png"} if has_back else None,
@@ -138,7 +145,7 @@ def build_card_json(project, card_id, internal_id=None, theme="birthday", templa
         },
         "status": status,
         "cardVersion": 1,
-        "metadata": {"tags": [], "note": "", "custom": {}},
+        "metadata": {"tags": [], "note": note, "custom": {}},
         "collection": {"collectionId": None},
         # 生成侧参数(Showcase 不读, 供工作台/重制使用)
         "_studio": {

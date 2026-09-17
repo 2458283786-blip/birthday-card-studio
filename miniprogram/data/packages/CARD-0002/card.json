@@ -7,6 +7,7 @@
   "template": "birthday-night",
   "title": null,
   "date": "2026-09-09",
+  "createdAt": "2026-09-15",
   "creator": {
     "id": "",
     "name": ""
@@ -21,6 +22,20 @@
     "message": "一帆风顺",
     "signature": null,
     "name": "风儿"
+  },
+  "front": {
+    "image": "front.png"
+  },
+  "back": {
+    "image": "back.png"
+  },
+  "layers": {
+    "background": "layers/background.png",
+    "subject": "layers/subject.png",
+    "effects": "layers/effects.png",
+    "text": "layers/text.png",
+    "lineart": "layers/lineart.png",
+    "frame": null
   },
   "material": {
     "type": "pearl",
@@ -58,6 +73,14 @@
   },
   "status": "final",
   "cardVersion": 1,
+  "metadata": {
+    "tags": [],
+    "note": "",
+    "custom": {}
+  },
+  "collection": {
+    "collectionId": null
+  },
   "hasBack": true,
   "layerNames": [
     "background",

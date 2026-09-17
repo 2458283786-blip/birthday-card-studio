@@ -7,6 +7,7 @@
   "template": "birthday-night",
   "title": "李四",
   "date": "2026-09-11",
+  "createdAt": "2026-09-15",
   "creator": {
     "id": "",
     "name": ""
@@ -21,6 +22,20 @@
     "message": "NEW WISH, SAME HEART",
     "signature": null,
     "name": "小明"
+  },
+  "front": {
+    "image": "front.png"
+  },
+  "back": {
+    "image": "back.png"
+  },
+  "layers": {
+    "background": "layers/background.png",
+    "subject": "layers/subject.png",
+    "effects": "layers/effects.png",
+    "text": "layers/text.png",
+    "lineart": "layers/lineart.png",
+    "frame": null
   },
   "material": {
     "type": "pearl",
@@ -58,6 +73,14 @@
   },
   "status": "final",
   "cardVersion": 1,
+  "metadata": {
+    "tags": [],
+    "note": "",
+    "custom": {}
+  },
+  "collection": {
+    "collectionId": null
+  },
   "hasBack": true,
   "layerNames": [
     "background",
