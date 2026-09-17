@@ -573,85 +573,157 @@ def plan_portrait(im, dna, occ, info):
     }
 
 
+def edge_env_color(im, band=26):
+    """从照片四周取环境色(做围边/过渡用)。"""
+    a = np.asarray(im.convert("RGB"), np.float32)
+    h, w = a.shape[:2]
+    b = max(4, min(band, h // 6, w // 6))
+    strips = [a[:b].reshape(-1, 3), a[-b:].reshape(-1, 3),
+              a[:, :b].reshape(-1, 3), a[:, -b:].reshape(-1, 3)]
+    col = np.concatenate(strips, 0).mean(0)
+    lum = float(col @ np.array([0.2126, 0.7152, 0.0722], np.float32))
+    col = col + (lum - col) * 0.35                       # 去饱和一点
+    col = col * 0.60 + 255.0 * 0.40 * 0.94               # 提亮 → 明亮的塑封底
+    return tuple(int(max(0, min(255, c))) for c in col)
+
+
+def clarity(im, radius=34, percent=26):
+    """局部对比(clarity): 让照片更有层次, 不产生 HDR 味。"""
+    return im.filter(ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=2))
+
+
+def feathered_mask(w, h, feather):
+    """四边线性羽化遮罩: 让照片边缘渐变融入围边。"""
+    m = np.ones((h, w), np.float32)
+    for i in range(feather):
+        v = (i + 1) / float(feather)
+        m[i, :] = np.minimum(m[i, :], v)
+        m[h - 1 - i, :] = np.minimum(m[h - 1 - i, :], v)
+        m[:, i] = np.minimum(m[:, i], v)
+        m[:, w - 1 - i] = np.minimum(m[:, w - 1 - i], v)
+    return Image.fromarray((m * 255).astype(np.uint8), "L")
+
+
 def render_portrait(im, dna, occ, spec, out_path=None):
     pal = spec["palette"]
+    RIM = 30                          # 塑封围边宽度
+    FEATHER = 16                      # 照片边缘羽化(过渡渐变)
+    pw, ph = W - 2 * RIM, H - 2 * RIM
+
+    # —— 照片: 裁切 → 尺寸 → 放大补偿 → clarity → 调色 ——
     crop = im.crop(spec["photo"])
-    up = W / float(max(1, crop.width))                 # >1 表示被放大(会糊)
-    body = crop.resize((W, H), Image.Resampling.LANCZOS)
-    if up > 1.05:                                      # 放大补偿: 轻度 USM, 只提清晰度不造伪影
+    up = W / float(max(1, crop.width))
+    body = crop.resize((pw, ph), Image.Resampling.LANCZOS)
+    if up > 1.05:
         body = body.filter(ImageFilter.UnsharpMask(radius=1.4, percent=int(min(120, 40 + 60 * up)),
-                                                   threshold=3))
+                                                  threshold=3))
     spec["upscale"] = round(up, 2)
     spec["quality_warning"] = ("原图裁切后需放大 %.2f×, 建议换更高分辨率照片" % up) if up > 1.15 else ""
+    body = clarity(body)
     body = portrait_grade(body, dna)
-    canvas = body.convert("RGBA")
+
+    # —— 围边: 环境色 → 明亮塑封底(上略亮/下略深) ——
+    env = edge_env_color(body)
+    r_top = tuple(int(min(255, c * 1.06 + 8)) for c in env)
+    r_bot = tuple(int(max(0, c * 0.90)) for c in env)
+    canvas = Image.new("RGBA", (W, H), r_top + (255,))
+    g = np.linspace(0, 1, H)[:, None, None]
+    grad = np.concatenate([np.array(r_top, np.float32)[None, None] * (1 - g) +
+                           np.array(r_bot, np.float32)[None, None] * g], 0)
+    grad = np.repeat(grad[:, :1, :], W, axis=1)
+    canvas = Image.fromarray(np.clip(grad, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
+
+    # —— 贴照片(羽化边缘 → 过渡) ——
+    canvas.paste(body, (RIM, RIM), feathered_mask(pw, ph, FEATHER))
+
+    # —— 塑封斜向光泽(整张卡, 边缘更明显) ——
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    t = np.clip(((xx / W) * 0.55 + (yy / H) * 0.45 - 0.02) / 0.75, 0, 1)
+    band = np.exp(-(((xx / W) * 0.62 + (yy / H) * 0.38 - 0.30) / 0.055) ** 2)   # 窄高光带
+    sheen = Image.fromarray((np.clip((1 - t) ** 1.5 * 62 + t ** 2.2 * 18 + band * 54, 0, 255)
+                             .astype(np.uint8)), "L")
+    white = Image.new("RGBA", (W, H), (255, 255, 255, 255))
+    canvas = Image.composite(white, canvas, sheen.point(lambda v: int(v * 0.55)))
+
     d = ImageDraw.Draw(canvas, "RGBA")
+    # —— 层次: 照片内侧柔和内阴影(压在塑封下) ——
+    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(sh)
+    for i in range(26):
+        a = int(78 * (1 - i / 26.0) ** 1.7)
+        sd.rectangle([RIM + i, RIM + i, W - RIM - 1 - i, H - RIM - 1 - i],
+                     outline=(0, 0, 0, a), width=1)
+    canvas.alpha_composite(sh.filter(ImageFilter.GaussianBlur(9)))
+    top_sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    td = ImageDraw.Draw(top_sh)
+    for i in range(84):
+        a = int(58 * (1 - i / 84.0) ** 1.5)
+        td.line([(RIM, RIM + i), (W - RIM, RIM + i)], fill=(0, 0, 0, a))
+    canvas.alpha_composite(top_sh.filter(ImageFilter.GaussianBlur(12)))
 
-    # —— 底部光影暗垫(渐变 + 大模糊), 保证浅色字可读 ——
+    # —— 塑封亮边: 内外两条细亮线 ——
+    d.rectangle([RIM - 1, RIM - 1, W - RIM, H - RIM], outline=(255, 255, 255, 120), width=1)
+    d.rectangle([RIM, RIM, W - RIM - 1, H - RIM - 1], outline=(255, 255, 255, 70), width=1)
+    d.rectangle([2, 2, W - 3, H - 3], outline=(255, 255, 255, 112), width=1)
+    d.rectangle([5, 5, W - 6, H - 6], outline=(255, 255, 255, 42), width=1)
+
+    # —— 底部光影暗垫(限制在照片范围内, 保证浅色字可读) ——
     scrim = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(scrim)
+    sd2 = ImageDraw.Draw(scrim)
     top = int(H * 0.46)
-    steps = 180
-    for i in range(steps):
-        t = i / (steps - 1.0)
-        y = int(top + (H - top) * t)
-        sd.line([(0, y), (W, y)], fill=(0, 0, 0, int(4 + 226 * (t ** 1.10))))
-    sd.line([(0, 0), (W, 0)], fill=(0, 0, 0, 74))
-    for i in range(90):                                              # 顶部薄暗, 让编号可读
-        t = i / 89.0
-        sd.line([(0, int(H * 0.16 * t)), (W, int(H * 0.16 * t))], fill=(0, 0, 0, int(70 * (1 - t))))
-    canvas.alpha_composite(scrim.filter(ImageFilter.GaussianBlur(26)))
-
-    # —— 文字区局部暗垫(大模糊 → 看起来是光影而不是色块) ——
+    for i in range(180):
+        tt = i / 179.0
+        y = int(top + (H - RIM - top) * tt)
+        sd2.line([(RIM, y), (W - RIM, y)], fill=(0, 0, 0, int(4 + 214 * (tt ** 1.12))))
+    sd2.line([(RIM, RIM), (W - RIM, RIM)], fill=(0, 0, 0, 70))
+    for i in range(90):
+        tt = i / 89.0
+        sd2.line([(RIM, int(RIM + (H * 0.16) * tt)), (W - RIM, int(RIM + (H * 0.16) * tt))],
+                 fill=(0, 0, 0, int(66 * (1 - tt))))
+    canvas.alpha_composite(scrim.filter(ImageFilter.GaussianBlur(24)))
     pad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     pd = ImageDraw.Draw(pad)
-    pd.rounded_rectangle([W // 20, int(H * 0.735), W - W // 20, int(H * 0.975)],
-                         radius=54, fill=(0, 0, 0, 150))
-    canvas.alpha_composite(pad.filter(ImageFilter.GaussianBlur(52)))
+    pd.rounded_rectangle([RIM + 20, int(H * 0.735), W - RIM - 20, int(H * 0.975)],
+                         radius=54, fill=(0, 0, 0, 146))
+    canvas.alpha_composite(pad.filter(ImageFilter.GaussianBlur(50)))
 
-    # —— 极细内框 ——
-    d.rectangle([W // 32, H // 48, W - 1 - W // 32, H - 1 - H // 48],
-                outline=(255, 250, 240, 52), width=1)
-
+    d = ImageDraw.Draw(canvas, "RGBA")
     ink = (247, 243, 234, 255)
     soft = (238, 232, 220, 215)
     faint = (230, 224, 212, 176)
-    shadow = (0, 0, 0, 120)
 
-    # —— 右上: 编号 ——
+    # —— 右上: 编号(留在照片区内) ——
     if spec["edition"]:
         f = fnt(spec["edition"], 34, "serif")
-        t = spec["edition"]
-        w = d.textlength(t, font=f) + 2.6 * max(0, len(t) - 1)
-        tracked(d, (W - W // 18 - w, H * 0.085), t, f, (250, 246, 238, 232), 2.6)
+        t2 = spec["edition"]
+        w2 = d.textlength(t2, font=f) + 2.6 * max(0, len(t2) - 1)
+        tracked(d, (W - RIM - 34 - w2, H * 0.088), t2, f, (250, 246, 238, 236), 2.6)
 
-    # —— 底部: 姓名(大衬线) + 副标题(小号大写) + 日期 ——
+    # —— 左下: 姓名 / 副标题 / 日期 ——
+    x0 = RIM + 34
     if spec["name"]:
         size = 96
         f = fnt(spec["name"], size, "serif")
-        while d.textlength(spec["name"], font=f) > W - 2 * (W // 12) and size > 44:
+        while d.textlength(spec["name"], font=f) > W - 2 * RIM - 68 and size > 40:
             size -= 3
             f = fnt(spec["name"], size, "serif")
-        d.text((W // 12 + 3, H * 0.800 + 3), spec["name"], font=f, fill=(0, 0, 0, 150))
-        d.text((W // 12, H * 0.800), spec["name"], font=f, fill=ink)
-
+        d.text((x0 + 3, H * 0.800 + 3), spec["name"], font=f, fill=(0, 0, 0, 150))
+        d.text((x0, H * 0.800), spec["name"], font=f, fill=ink)
     if spec["subtitle"]:
-        t = spec["subtitle"].upper()
-        fsub = fnt(t, 20, "sansb")
-        tracked(d, (W // 12 + 2, H * 0.872 + 2), t, fsub, (0, 0, 0, 140), 6.4)
-        tracked(d, (W // 12, H * 0.872), t, fsub, soft, 6.4)
-
+        t2 = spec["subtitle"].upper()
+        fsub = fnt(t2, 20, "sansb")
+        tracked(d, (x0 + 2, H * 0.872 + 2), t2, fsub, (0, 0, 0, 140), 6.4)
+        tracked(d, (x0, H * 0.872), t2, fsub, soft, 6.4)
     if spec["date"]:
         fdt = fnt(spec["date"], 20, "sans")
-        tracked(d, (W // 12 + 2, H * 0.930 + 2), spec["date"], fdt, (0, 0, 0, 130), 3.2)
-        tracked(d, (W // 12, H * 0.930), spec["date"], fdt, faint, 3.2)
+        tracked(d, (x0 + 2, H * 0.930 + 2), spec["date"], fdt, (0, 0, 0, 130), 3.2)
+        tracked(d, (x0, H * 0.930), spec["date"], fdt, faint, 3.2)
 
     out = canvas.convert("RGB")
     if out_path:
         out.save(out_path)
         return out_path
     return out
-
 
 def build(photo_path, info, lang="editorial", out_dir="dl2/out"):
     path = Path(photo_path)
