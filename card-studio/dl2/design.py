@@ -575,7 +575,15 @@ def plan_portrait(im, dna, occ, info):
 
 def render_portrait(im, dna, occ, spec, out_path=None):
     pal = spec["palette"]
-    body = portrait_grade(im.crop(spec["photo"]).resize((W, H), Image.Resampling.LANCZOS), dna)
+    crop = im.crop(spec["photo"])
+    up = W / float(max(1, crop.width))                 # >1 表示被放大(会糊)
+    body = crop.resize((W, H), Image.Resampling.LANCZOS)
+    if up > 1.05:                                      # 放大补偿: 轻度 USM, 只提清晰度不造伪影
+        body = body.filter(ImageFilter.UnsharpMask(radius=1.4, percent=int(min(120, 40 + 60 * up)),
+                                                   threshold=3))
+    spec["upscale"] = round(up, 2)
+    spec["quality_warning"] = ("原图裁切后需放大 %.2f×, 建议换更高分辨率照片" % up) if up > 1.15 else ""
+    body = portrait_grade(body, dna)
     canvas = body.convert("RGBA")
     d = ImageDraw.Draw(canvas, "RGBA")
 
