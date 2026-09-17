@@ -107,6 +107,51 @@ def main():
     check("holoEnabled=false 也照传",
           bmp.trim_card_json({"material": {"holoEnabled": False}}, {}, {})["holoEnabled"] is False)
 
+    print("\n[5] 区域材质（照网页版 app.js 的规则）")
+    base_card = {"material": {"holoEnabled": True},
+                 "content": {}, "cardId": "CARD-M"}
+    mats, holo = bmp.material_regions(base_card, {"foil": 0.55}, {"finish": "pearl"})
+    check("默认: 边框/主体/背景 = pearl", 
+          [mats[k]["type"] for k in ("frame", "subject", "background")] == ["pearl"] * 3,
+          json.dumps(mats, ensure_ascii=False))
+    check("默认: 文字 = matte 且材质量为 0（字体不上材质）",
+          mats["text"]["type"] == "matte" and mats["text"]["amount"] == 0,
+          json.dumps(mats["text"]))
+    check("默认材质量 = foil 参数（文字除外）",
+          mats["frame"]["amount"] == 0.55 and mats["subject"]["amount"] == 0.55,
+          json.dumps({k: mats[k]["amount"] for k in mats}))
+    check("holoOn 判定照抄（pearl → true）", holo is True)
+    check("材质名 → 索引正确 (matte0 pearl1 foil2 gloss3)",
+          mats["pearl" if False else "frame"]["index"] == 1 and mats["text"]["index"] == 0,
+          json.dumps(mats, ensure_ascii=False))
+
+    mats2, _ = bmp.material_regions(
+        {"material": {"regions": {"subject": "gold"}, "amounts": {"background": 0.2}}},
+        {"foil": 0.5}, {"finish": "gold"})
+    check("区域材质可被覆盖（未知名字回退到默认）",
+          mats2["subject"]["type"] == "pearl" and mats2["background"]["amount"] == 0.2,
+          json.dumps(mats2, ensure_ascii=False))
+
+    mats3, holo3 = bmp.material_regions(
+        {"material": {"holoEnabled": False}}, {}, {"finish": "pearl"})
+    check("holoEnabled=false → 所有材质量归零",
+          all(m["amount"] == 0 for m in mats3.values()) and holo3 is False,
+          json.dumps({k: mats3[k]["amount"] for k in mats3}))
+    mats4, holo4 = bmp.material_regions({}, {}, {"finish": "original"})
+    check("original 材质 → 关闭全息且材质量归零",
+          holo4 is False and all(m["amount"] == 0 for m in mats4.values()))
+
+    print("\n[6] 区域材质有偏差时要报警（别默默丢掉效果）")
+    warn_ok = bmp.material_warnings(bmp.material_regions(
+        {"material": {"amounts": {"text": 0.5}}}, {"foil": 0.5}, {"finish": "pearl"})[0])
+    check("文字层配了材质 → 报警", any("文字层" in w for w in warn_ok), str(warn_ok))
+    warn_mix = bmp.material_warnings(bmp.material_regions(
+        {"material": {"regions": {"subject": "gloss"}}}, {"foil": 0.5}, {"finish": "pearl"})[0])
+    check("各区域材质不一致 → 报警", any("不一致" in w for w in warn_mix), str(warn_mix))
+    check("默认配置不报警（不能天天狼来了）",
+          bmp.material_warnings(bmp.material_regions(
+              {"material": {}}, {"foil": 0.5}, {"finish": "pearl"})[0]) == [])
+
     print(f"\n结果: {passed} 通过 / {failed} 失败")
     return 1 if failed else 0
 

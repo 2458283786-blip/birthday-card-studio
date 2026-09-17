@@ -8,6 +8,7 @@
 
 用法: python card-studio/make_static_card.py <项目目录> [--board]
 """
+import os
 import sys
 from pathlib import Path
 
@@ -18,20 +19,41 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 
 
+def load_layer(path, tries=5, wait=0.35):
+    """读图层: 若碰到"写了一半"的 PNG(truncated), 等一会儿重试。"""
+    import time
+    last = None
+    for i in range(tries):
+        try:
+            im = Image.open(path)
+            im.load()                      # 真正解码, 触发截断错误
+            return im.convert("RGBA")
+        except Exception as e:             # OSError: image file is truncated 等
+            last = e
+            time.sleep(wait * (i + 1))
+    raise RuntimeError(f"图层读取失败(可能正在写入): {path} — {last}")
+
+
 def flatten(project):
     a = Path(project) / "assets"
-    out = Image.open(a / "background.png").convert("RGBA")
+    bg = a / "background.png"
+    if not bg.exists():
+        raise RuntimeError(f"缺少底图: {bg}")
+    out = load_layer(bg)
     for name in ("subject", "effects", "text"):
         p = a / f"{name}.png"
         if p.exists():
-            out.alpha_composite(Image.open(p).convert("RGBA"))
+            out.alpha_composite(load_layer(p))
     return out.convert("RGB")
 
 
 def main():
     project = Path(sys.argv[1])
     png = project / "static.png"
-    flatten(project).save(png)
+    img = flatten(project)
+    tmp = png.with_name(png.stem + ".tmp" + png.suffix)
+    img.save(tmp, format="PNG")
+    os.replace(tmp, png)
     print("静态卡面:", png, Image.open(png).size, f"{png.stat().st_size/1e6:.2f} MB")
     # 背面(读 backStyle, 与网页同一套设计)
     try:

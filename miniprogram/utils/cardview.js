@@ -80,6 +80,8 @@ function buildView(meta, assets) {
     finish,
     foil,
     holoOn: finish !== 'original' && meta.holoEnabled !== false,
+    // 区域材质(边框/文字/主体/背景): 材质层盖到哪一层、以及将来做区域材质都要它
+    materials: meta.materials || null,
     notes,
     owners
   };
@@ -98,6 +100,7 @@ function toView(item) {
     finish: item.finish,
     foil: item.foil,
     holoEnabled: item.holoEnabled,
+    materials: item.materials,
     fields: item.fields || fieldsOf(item)
   }, {
     front: item.front,
@@ -122,6 +125,7 @@ function viewFromRecord(record) {
     finish: card.finish,
     foil: card.foil,
     holoEnabled: card.holoEnabled,
+    materials: card.materials,
     fields: card.fields || fieldsOf(card)
   }, {
     front: assets.front,

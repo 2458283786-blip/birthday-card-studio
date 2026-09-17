@@ -79,6 +79,15 @@ CREAM = np.array([0.984, 0.965, 0.925], dtype=np.float32)
 def log(m):
     print(f"[{m}]", flush=True)
 
+def _save_atomic(img, path):
+    """原子写: 先写临时文件再替换 —— 避免读图方读到写了一半的 PNG。"""
+    path = Path(path)
+    tmp = path.with_name(path.stem + ".tmp" + path.suffix)   # 保留扩展名, 便于 PIL 推断格式
+    img.save(tmp, format=(path.suffix.lstrip(".").upper() or None))
+    os.replace(tmp, path)
+    return path
+
+
 
 def font(path, size):
     for p in (path, ARIAL_BD, os.path.join(FONTS, "georgia.ttf")):
@@ -822,7 +831,7 @@ def main():
     if BASE_OVERRIDE:
         log(f"底色覆盖: #{BASE_OVERRIDE[0]:02x}{BASE_OVERRIDE[1]:02x}{BASE_OVERRIDE[2]:02x}")
 
-    ImageOps.exif_transpose(Image.open(photo)).convert("RGB").save(out / "source.png")
+    _save_atomic(ImageOps.exif_transpose(Image.open(photo)).convert("RGB"), out / "source.png")
     box, kind = photo_box(tpl)
     lay = cfg.get("layout") or {}                  # 进阶设置: 版面比例微调(Night)
     if tpl == "night" and lay.get("photoBottom"):
@@ -832,11 +841,11 @@ def main():
             log(f"版面覆盖: 照片底 {pb}")
         except Exception:
             pass
-    photo_layer(photo, tpl, box, kind).save(out / "subject.png")
-    background(tpl).save(out / "background.png")
-    lineart(tpl).save(out / "lineart.png")
-    text_layer(tpl, cfg).save(out / "text.png")
-    effects(tpl).save(out / "effects.png")
+    _save_atomic(photo_layer(photo, tpl, box, kind), out / "subject.png")
+    _save_atomic(background(tpl), out / "background.png")
+    _save_atomic(lineart(tpl), out / "lineart.png")
+    _save_atomic(text_layer(tpl, cfg), out / "text.png")
+    _save_atomic(effects(tpl), out / "effects.png")
     log(f"{tpl} 五层已生成 → {out}")
 
 

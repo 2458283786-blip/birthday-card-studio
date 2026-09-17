@@ -210,6 +210,10 @@ async function run() {
   check('卡牌底色带过来了(缩略图加载时用它当底色)',
     typeof card.bgColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(card.bgColor),
     String(card.bgColor));
+  check('区域材质带过来了(决定材质层盖到哪一层)',
+    !!card.materials && card.materials.text && card.materials.text.amount === 0
+    && typeof card.materials.frame.amount === 'number',
+    JSON.stringify(card.materials));
 
   console.log('\n[4] 我的收藏(cloud 模式)');
   let cards = await api.listCards();

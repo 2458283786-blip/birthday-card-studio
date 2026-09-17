@@ -46,6 +46,21 @@ BACK_STYLE = {
 }
 
 
+
+def safe_open(path, tries=5, wait=0.3):
+    """安全读图: 碰到写了一半的 PNG 就等一会重试(与 make_static_card 一致)。"""
+    import time
+    last = None
+    for i in range(tries):
+        try:
+            im = Image.open(path)
+            im.load()
+            return im
+        except Exception as e:
+            last = e
+            time.sleep(wait * (i + 1))
+    raise RuntimeError(f"读图失败: {path} — {last}")
+
 def f(path, size):
     try:
         return ImageFont.truetype(path, size)
