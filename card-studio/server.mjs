@@ -295,6 +295,50 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(list));
     }
 
+    // ---- Art Director: 照片分析(V2 步骤②) ----
+    if (req.method === "POST" && p === "/api/analyze") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const id = String(raw.id || "");
+      const dir = path.join(PROJECTS, id);
+      if (!/^card-[a-z0-9]+$/.test(id) || !existsSync(dir)) { res.writeHead(404); return res.end("no card"); }
+      const py = process.env.PY || "python";
+      const outDir = path.join(dir, "_analyze");
+      const logPath = path.join(dir, "analyze.log");
+      const args = [py, "-u", path.join(__dir, "dl2", "art_director.py"), dir,
+                    "--analyze-only", "--out", outDir];
+      if (raw.ai && (process.env.DEEPSEEK_API_KEY || "").trim()) args.push("--ai");
+      const code = await runPy(args, ROOT, logPath, (l) => {
+        const job = jobs.get(id); if (job) job.lines.push(l);
+      });
+      let data = null;
+      try { data = JSON.parse(await readFile(path.join(outDir, "_analyze.json"), "utf8")); } catch {}
+      res.writeHead(code === 0 && data ? 200 : 500, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify(data || { ok: false, error: "分析失败, 见任务日志" }));
+    }
+
+    // ---- Art Director: 产出 3~4 个提案(V2 步骤③) ----
+    if (req.method === "POST" && p === "/api/proposals") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const id = String(raw.id || "");
+      const dir = path.join(PROJECTS, id);
+      if (!/^card-[a-z0-9]+$/.test(id) || !existsSync(dir)) { res.writeHead(404); return res.end("no card"); }
+      const py = process.env.PY || "python";
+      const cfgPath = path.join(dir, "card-config.json");
+      const outDir = path.join(dir, "proposals");
+      const logPath = path.join(dir, "proposals.log");
+      const n = Math.max(2, Math.min(4, Number(raw.n) || 3));
+      const args = [py, "-u", path.join(__dir, "dl2", "art_director.py"), dir,
+                    "--out", outDir, "--n", String(n)];
+      if (existsSync(cfgPath)) args.push("--info", cfgPath);
+      const code = await runPy(args, ROOT, logPath, (l) => {
+        const job = jobs.get(id); if (job) job.lines.push(l);
+      });
+      let data = null;
+      try { data = JSON.parse(await readFile(path.join(outDir, "proposals.json"), "utf8")); } catch {}
+      res.writeHead(code === 0 && data ? 200 : 500, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify(data || { ok: false, error: "提案失败, 见任务日志" }));
+    }
+
     // ---- AI 状态: 工坊是否配了 key(只报告, 不泄露 key 本身) ----
     if (req.method === "GET" && p === "/api/ai-status") {
       const key = (process.env.DEEPSEEK_API_KEY || "").trim();
@@ -443,6 +487,12 @@ const server = http.createServer(async (req, res) => {
     const tplImg = p.match(/^\/tpl\/([a-z]+)\.png$/);
     if (tplImg && req.method === "GET") {
       return serveStatic(req, res, path.join(__dir, "template-previews"), tplImg[1] + ".png");
+    }
+
+    // 提案图(V2 步骤③): 只允许 proposals/ 下的 png
+    const prop = p.match(/^\/proposal\/([a-z0-9-]+)\/([a-z0-9._-]+\.png)$/i);
+    if (prop && req.method === "GET") {
+      return serveStatic(req, res, path.join(PROJECTS, prop[1], "proposals"), prop[2]);
     }
 
     // 项目内的静态卡面图(白名单)
