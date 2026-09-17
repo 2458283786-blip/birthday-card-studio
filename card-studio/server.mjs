@@ -295,6 +295,72 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(list));
     }
 
+    // ---- V2 新订单: 最小字段(照片 + 姓名/日期/文案/备注) → 建工作项目 ----
+    if (req.method === "POST" && p === "/api/order") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const m = /^data:image\/[a-zA-Z]+;base64,(.+)$/.exec(String(raw.imageData || ""));
+      if (!m) { res.writeHead(400); return res.end("no image"); }
+      const id = "card-" + Date.now().toString(36) + Math.floor(Math.random() * 900 + 100).toString(36);
+      const dir = path.join(PROJECTS, id);
+      await mkdir(path.join(dir, "assets"), { recursive: true });
+      await mkdir(path.join(dir, "web", "assets"), { recursive: true });
+      await writeFile(path.join(dir, "_upload.png"), Buffer.from(m[1], "base64"));
+      // Card ID 系统自动生成(规范 §5: 禁止手工填写)
+      const n = (await readdir(PROJECTS)).filter((x) => x.startsWith("card-")).length + 1;
+      const edition = "CARD #" + String(n).padStart(4, "0");
+      const cfg = {
+        schemaVersion: "1.0",
+        occasion: String(raw.occasion || "personal"),
+        designLanguage: "",
+        title: "", subtitle: "Personal Style", edition,
+        technique: String(raw.date || "").trim(),
+        name: String(raw.name || "").trim(),
+        message: String(raw.message || "").trim(),
+        note: String(raw.note || "").trim(),
+        collection: "Digital Collectible",
+        backStyle: "night",
+        appearance: { finish: "gold", background: "#efece6" },
+        material: { regions: { frame: "gloss", text: "gloss", subject: "matte", background: "matte" },
+                    amounts: { frame: .85, text: .55, subject: 0, background: 0 } },
+        parameters: { subjectDepth: .10, backgroundDepth: -.22, effectsDepth: .78, textDepth: .46,
+                      foil: .6, motionStrength: .8 },
+        interaction: { parallax: true, flip: true, holo: true, deviceMotion: true },
+      };
+      const j = JSON.stringify(cfg, null, 2);
+      await writeFile(path.join(dir, "card-config.json"), j, "utf8");
+      await writeFile(path.join(dir, "web", "card-config.json"), j, "utf8");
+      await writeFile(path.join(dir, "meta.json"), JSON.stringify({
+        title: cfg.name || "未命名", edition, technique: cfg.technique, template: "v2",
+        designLanguage: "", note: cfg.note,
+      }, null, 2), "utf8");
+      await restoreHistory();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ok: true, id, edition }));
+    }
+
+    // ---- V2 采用提案: 按选定语言把订单做成卡(正面+分层+背面+静态图) ----
+    if (req.method === "POST" && p === "/api/adopt") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const id = String(raw.id || "");
+      const dir = path.join(PROJECTS, id);
+      if (!/^card-[a-z0-9]+$/.test(id) || !existsSync(dir)) { res.writeHead(404); return res.end("no card"); }
+      const lang = ["portrait", "editorial", "memory", "cinema", "cyber"].includes(String(raw.lang))
+        ? String(raw.lang) : "portrait";
+      const logPath = path.join(dir, "build.log");
+      const args = [process.env.PY || "python", "-u", path.join(__dir, "dl2", "build_card.py"), dir,
+                    "--lang", lang];
+      if (raw.viewerFrom) args.push("--viewer-from", String(raw.viewerFrom));
+      const code = await runPy(args, ROOT, logPath, (l) => {
+        const job = jobs.get(id);
+        if (job) job.lines.push(l);
+      });
+      await restoreHistory();
+      const done = existsSync(path.join(dir, "static.png"));
+      res.writeHead(code === 0 && done ? 200 : 500, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ok: code === 0 && done, id, lang,
+        preview: "/p/" + id + "/", log: "/api/jobs/" + id + "/log" }));
+    }
+
     // ---- Art Director: 照片分析(V2 步骤②) ----
     if (req.method === "POST" && p === "/api/analyze") {
       const raw = JSON.parse((await body(req)).toString("utf8"));
@@ -490,7 +556,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // 提案图(V2 步骤③): 只允许 proposals/ 下的 png
-    const prop = p.match(/^\/proposal\/([a-z0-9-]+)\/([a-z0-9._-]+\.png)$/i);
+    const prop = p.match(/^\/proposal\/([a-z0-9-]+)\/((?:thumbs\/)?[a-z0-9._-]+\.(?:png|jpg))$/i);
     if (prop && req.method === "GET") {
       return serveStatic(req, res, path.join(PROJECTS, prop[1], "proposals"), prop[2]);
     }

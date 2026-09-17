@@ -1,0 +1,162 @@
+# -*- coding: utf-8 -*-
+"""Phase 2A 界面: V2 工作流的 JS(建单 / 分析 / 提案 / 采用 / QA / 模式切换)"""
+from pathlib import Path
+
+P = Path("card-studio/public/index.html")
+s = P.read_text(encoding="utf8")
+
+JS = r'''
+/* ---------------- V2 工作流 ---------------- */
+let v2 = { id: null, analysis: null, proposals: null, lang: null };
+let uiMode = "v2";
+
+function setMode(m) {
+  uiMode = m;
+  $("v2Pane").style.display = m === "v2" ? "" : "none";
+  $("classicPane").style.display = m === "classic" ? "" : "none";
+  document.querySelectorAll("#modeSwitch button").forEach((b) => b.classList.toggle("on", b.dataset.m === m));
+}
+document.querySelectorAll("#modeSwitch button").forEach((b) => b.onclick = () => setMode(b.dataset.m));
+
+const blobToDataURL = (blob) => new Promise((r) => {
+  const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(blob); });
+
+async function v2Order() {
+  if (!chosen) { toast("先放入照片", true); return; }
+  $("v2_orderState").textContent = "正在建立订单…";
+  try {
+    const r = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageData: await blobToDataURL(chosen), name: val("v2_name"),
+                             date: val("v2_date"), message: val("v2_msg"), note: val("v2_note") }) });
+    const d = await r.json();
+    if (!r.ok || !d.ok) { $("v2_orderState").textContent = "建立失败"; toast("建立订单失败", true); return; }
+    v2.id = d.id; v2.analysis = null; v2.proposals = null;
+    $("v2_orderState").innerHTML = "已建订单 · <b>" + d.edition + "</b>";
+    $("v2_analyze").disabled = false; $("v2_propose").disabled = false;
+    $("v2_analysis").style.display = "none"; $("v2_props").innerHTML = "";
+    $("v2_qaCard").style.display = "none";
+    toast("订单已建立:" + d.edition);
+    poll();
+  } catch (e) { $("v2_orderState").textContent = "建立失败: " + e; }
+}
+
+function renderAnalysis(a) {
+  const box = $("v2_analysis");
+  const rec = a.recommended || {};
+  const rows = (a.ranked || []).slice(0, 5).map((r) =>
+    '<div class="fitbar"><span>' + esc(r.name || r.lang) + '</span><i style="width:' +
+    Math.round((r.score || 0) * 100) + '%"></i><span>' + (r.score == null ? "-" : r.score.toFixed(2)) + "</span></div>").join("");
+  const ai = a.ai_offer || {};
+  box.innerHTML =
+    '<div style="font-size:12.5px;line-height:1.7">' +
+    "<div><b>推荐语言:</b> " + esc(rec.name || rec.lang || "-") + " <span class='muted'>" + esc(rec.why || "") + "</span></div>" +
+    (ai && !ai.error && ai.scene ? "<div><b>AI 看到:</b> " + esc(ai.scene) + "</div>" : "") +
+    (ai && !ai.error && ai.risks ? "<div class='muted'>风险: " + esc(ai.risks) + "</div>" : "") +
+    (ai && ai.error === "no_key" ? "<div class='muted'>未配置 API Key, 仅用程序度量</div>" : "") +
+    "</div><div style='margin-top:8px'>" + rows + "</div>";
+  box.style.display = "block";
+}
+
+$("v2_analyze").onclick = async () => {
+  if (!v2.id) { toast("先建立订单", true); return; }
+  $("v2_analyzeState").textContent = "分析中…(含 AI 约 10 秒)";
+  try {
+    const r = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: v2.id, ai: true }) });
+    const a = await r.json();
+    if (!a.ok) { $("v2_analyzeState").textContent = "分析失败"; return; }
+    v2.analysis = a; renderAnalysis(a);
+    $("v2_analyzeState").textContent = "完成";
+  } catch (e) { $("v2_analyzeState").textContent = "分析失败: " + e; }
+};
+
+function renderProps(m) {
+  const box = $("v2_props");
+  const ps = m.proposals || [];
+  if (!ps.length) { box.innerHTML = '<span class="muted">没有生成提案</span>'; return; }
+  box.innerHTML = ps.map((p) => {
+    const img = p.thumb ? "/proposal/" + v2.id + "/" + p.thumb : "";
+    return '<div class="prop" data-lang="' + p.lang + '">' +
+      (img ? '<img src="' + img + '" alt="' + esc(p.name) + '" loading="lazy" />' : "") +
+      '<div class="pb"><b>' + p.id + " · " + esc(p.name) + "</b>" +
+      '<span class="muted">' + esc((p.why || p.error || "").slice(0, 42)) + "</span>" +
+      '<button class="mini" data-adopt="' + p.lang + '">选它</button></div></div>';
+  }).join("");
+  box.querySelectorAll("[data-adopt]").forEach((b) => b.onclick = () => v2Adopt(b.dataset.adopt, b));
+}
+
+$("v2_propose").onclick = async () => {
+  if (!v2.id) { toast("先建立订单", true); return; }
+  $("v2_proposeState").textContent = "生成中…(每套约 3~5 秒)";
+  try {
+    const r = await fetch("/api/proposals", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: v2.id, n: 3 }) });
+    const m = await r.json();
+    if (!m.ok) { $("v2_proposeState").textContent = "生成失败"; return; }
+    v2.proposals = m; renderProps(m);
+    $("v2_proposeState").textContent = "已出 " + (m.proposals || []).length + " 个提案" +
+      ((m.pending || []).length ? "(待实现: " + m.pending.join(",") + ")" : "");
+  } catch (e) { $("v2_proposeState").textContent = "生成失败: " + e; }
+};
+
+async function v2Adopt(lang, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "建卡中…"; }
+  document.querySelectorAll("#v2_props .prop").forEach((el) => el.classList.toggle("on", el.dataset.lang === lang));
+  try {
+    const r = await fetch("/api/adopt", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: v2.id, lang, viewerFrom: "card-mu2o5m1y" }) });
+    const d = await r.json();
+    if (!d.ok) { toast("建卡失败, 见日志", true); if (btn) { btn.disabled = false; btn.textContent = "选它"; } return; }
+    v2.lang = lang; currentJob = v2.id;
+    $("curTitle").textContent = "V2 订单 · " + lang.toUpperCase();
+    $("curMeta").textContent = "已按 " + lang + " 建卡, 右侧可拖动预览";
+    $("exportBtn").disabled = false; $("openTab").disabled = false;
+    showView(v2.id, "3d");
+    await renderQA();
+    $("v2_qaCard").style.display = "block";
+    toast("已采用 " + lang.toUpperCase() + " 建卡");
+    poll();
+  } catch (e) { toast("建卡失败: " + e, true); if (btn) { btn.disabled = false; btn.textContent = "选它"; } }
+}
+
+async function renderQA() {
+  const ul = $("v2_qa");
+  let c = { fields: {} };
+  try { c = await (await fetch("/api/config/" + v2.id)).json(); } catch (e) {}
+  const f = c.fields || {};
+  const rows = [
+    ["Card ID", !!f.edition, f.edition || "缺失"],
+    ["纪念日期", !!f.technique, f.technique || "缺失"],
+    ["客户文案", !!f.message, f.message ? "已填" : "未填(可选)"],
+    ["背面 Identity", true, "统一背面已生成"],
+    ["二维码", !!(c.qr && c.qr.enabled) || !!f.qrUrl, f.qrUrl ? "已配置" : "未配置(可选)"],
+    ["设计语言", !!c.template, (c.template || "-")],
+    ["交付包", true, "点右侧「导出卡包」生成"],
+  ];
+  ul.innerHTML = rows.map(([k, ok, v]) =>
+    "<li><span class='" + (ok ? "yes" : "no") + "'>" + (ok ? "✓" : "—") + "</span><span>" + k +
+    "</span><span class='muted'>" + esc(String(v)) + "</span></li>").join("");
+  $("v2_qaHint").textContent = "规范 §15 QA: 以上为可自动核对的项; 视觉与文案请人工确认";
+}
+
+$("v2_order").onclick = v2Order;
+'''
+anchor = "(async () => {                                   // 顶栏 AI 指示灯"
+if "V2 工作流 ----------------" not in s:
+    s = s.replace(anchor, JS + "\n" + anchor, 1)
+    print("V2 JS: OK")
+
+# 上传后同时启用 V2 建单按钮
+old_load = '''  $("go").disabled = false;
+  if (!$("f_title").value) {'''
+new_load = '''  $("go").disabled = false;
+  const vo = $("v2_order"); if (vo) { vo.disabled = false; $("v2_orderState").textContent = "照片已就绪, 可建立订单"; }
+  if (!$("f_title").value) {'''
+if old_load in s:
+    s = s.replace(old_load, new_load, 1)
+    print("上传联动: OK")
+
+# 启动时应用默认模式
+s = s.replace("syncTemplate();", "syncTemplate();\nsetMode('v2');", 1)
+P.write_text(s, encoding="utf8")
+print("完成")

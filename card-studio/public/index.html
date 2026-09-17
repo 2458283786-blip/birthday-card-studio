@@ -121,6 +121,20 @@
   .toast.err{background:#7d2f22}
   .tplPreview{margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
   .tplPreview img{width:100%;display:block}
+  .props{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;margin-top:10px}
+  .prop{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+  .prop.on{border-color:var(--clay);box-shadow:0 0 0 2px #fdf4ee}
+  .prop img{width:100%;display:block;aspect-ratio:2/3;object-fit:cover;background:#f2f0eb}
+  .prop .pb{padding:8px 9px 10px;display:flex;flex-direction:column;gap:5px;flex:1}
+  .prop .pb b{font-size:12px}
+  .prop .pb .muted{font-size:11px;line-height:1.45}
+  .prop .pb button{margin-top:auto}
+  .fitbar{display:grid;grid-template-columns:76px 1fr 34px;align-items:center;gap:6px;font-size:11px;color:var(--mut)}
+  .fitbar i{height:6px;border-radius:3px;background:var(--green);display:block}
+  .qa{list-style:none;padding:0;margin:0;font-size:12.5px}
+  .qa li{padding:3px 0;display:flex;gap:8px}
+  .qa .yes{color:var(--green);font-weight:600}
+  .qa .no{color:var(--clay)}
   .swatches{display:flex;flex-wrap:wrap;gap:8px}
   .sw{width:44px;height:44px;border-radius:9px;border:2px solid transparent;cursor:pointer;position:relative;
       box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
@@ -147,6 +161,10 @@
   <button class="tbtn" id="aiBtn" title="AI 辅助(下一步接入: 语义判读 / 选色 / 版式建议)">
     <span class="dot" id="aiDot"></span>AI 辅助
   </button>
+  <div class="modes" id="modeSwitch" style="margin-right:6px">
+    <button data-m="v2" class="on">V2 工作流</button>
+    <button data-m="classic">经典模板</button>
+  </div>
   <button class="tbtn" id="exportCenter">📦 导出中心</button>
   <button class="tbtn" id="histBtnTop">🗂 历史记录</button>
 </header>
@@ -165,6 +183,48 @@
       <div id="preview"><img id="thumb" alt="预览" /><div><b id="fname"></b><br /><span class="muted" id="fsize"></span></div></div>
     </section>
 
+    <div id="v2Pane">
+      <section class="card">
+        <h2><span class="n">1</span>客户内容</h2>
+        <div class="grid">
+          <div><label>姓名</label><input id="v2_name" placeholder="客户姓名 / 昵称" /></div>
+          <div><label>纪念日期</label><input id="v2_date" placeholder="2026.09.16" /></div>
+          <div class="full"><label>客户文案</label><input id="v2_msg" placeholder="客户原话 / 祝福语" /></div>
+          <div class="full"><label>备注(仅内部)</label><input id="v2_note" placeholder="工作台内部备注" /></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+          <button class="btn" id="v2_order" style="height:34px;padding:0 16px;font-size:13px" disabled>建立订单</button>
+          <span class="muted" id="v2_orderState">先放入照片</span>
+        </div>
+        <div class="muted" style="margin-top:8px">Card ID 由系统自动生成(规范 §5: 禁止手工填写)</div>
+      </section>
+
+      <section class="card">
+        <h2><span class="n">2</span>AI 设计分析</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="mini" id="v2_analyze" disabled>🔍 让 AI 看这张照片</button>
+          <span class="muted" id="v2_analyzeState"></span>
+        </div>
+        <div id="v2_analysis" style="display:none;margin-top:10px"></div>
+      </section>
+
+      <section class="card">
+        <h2><span class="n">3</span>设计提案</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="mini" id="v2_propose" disabled>🎨 生成 3 个提案</button>
+          <span class="muted" id="v2_proposeState"></span>
+        </div>
+        <div id="v2_props" class="props"></div>
+      </section>
+
+      <section class="card" id="v2_qaCard" style="display:none">
+        <h2><span class="n">5</span>QA 检查</h2>
+        <ul class="qa" id="v2_qa"></ul>
+        <div class="muted" id="v2_qaHint" style="margin-top:6px"></div>
+      </section>
+    </div>
+
+    <div id="classicPane" style="display:none">
     <section class="card">
       <h2><span class="n">2</span>卡片信息</h2>
       <div class="grid" id="fields">
@@ -263,6 +323,7 @@
         <div class="tplPreview" id="tplPreviewWrap"><img id="tplPreview" alt="字段落位图" /></div>
       </div>
     </section>
+    </div>
   </aside>
 
   <section class="right">
@@ -799,6 +860,145 @@ if ($("aiColor")) $("aiColor").onclick = () => loadPalette(true);
 if ($("applyBase")) $("applyBase").onclick = () => loadPalette(false);
 if ($("applyAdv")) $("applyAdv").onclick = applyAdvanced;
 
+
+/* ---------------- V2 工作流 ---------------- */
+let v2 = { id: null, analysis: null, proposals: null, lang: null };
+let uiMode = "v2";
+
+function setMode(m) {
+  uiMode = m;
+  const vp = $("v2Pane"), cp = $("classicPane");
+  if (vp) vp.style.display = m === "v2" ? "" : "none";
+  if (cp) cp.style.display = m === "classic" ? "" : "none";
+  document.querySelectorAll("#modeSwitch button").forEach((b) => b.classList.toggle("on", b.dataset.m === m));
+}
+document.querySelectorAll("#modeSwitch button").forEach((b) => { b.onclick = () => setMode(b.dataset.m); });
+
+const blobToDataURL = (blob) => new Promise((r) => {
+  const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(blob); });
+
+async function v2Order() {
+  if (!chosen) { toast("先放入照片", true); return; }
+  $("v2_orderState").textContent = "正在建立订单…";
+  try {
+    const r = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageData: await blobToDataURL(chosen), name: val("v2_name"),
+                             date: val("v2_date"), message: val("v2_msg"), note: val("v2_note") }) });
+    const d = await r.json();
+    if (!r.ok || !d.ok) { $("v2_orderState").textContent = "建立失败"; toast("建立订单失败", true); return; }
+    v2.id = d.id; v2.analysis = null; v2.proposals = null;
+    $("v2_orderState").innerHTML = "已建订单 · <b>" + d.edition + "</b>";
+    $("v2_analyze").disabled = false; $("v2_propose").disabled = false;
+    $("v2_analysis").style.display = "none"; $("v2_props").innerHTML = "";
+    $("v2_qaCard").style.display = "none";
+    toast("订单已建立:" + d.edition);
+    poll();
+  } catch (e) { $("v2_orderState").textContent = "建立失败: " + e; }
+}
+
+function renderAnalysis(a) {
+  const box = $("v2_analysis");
+  const rec = a.recommended || {};
+  const rows = (a.ranked || []).slice(0, 5).map((r) =>
+    '<div class="fitbar"><span>' + esc(r.name || r.lang) + '</span><i style="width:' +
+    Math.round((r.score || 0) * 100) + '%"></i><span>' +
+    (r.score == null ? "-" : Number(r.score).toFixed(2)) + "</span></div>").join("");
+  const ai = a.ai_offer || {};
+  box.innerHTML =
+    '<div style="font-size:12.5px;line-height:1.7">' +
+    "<div><b>推荐语言:</b> " + esc(rec.name || rec.lang || "-") + " <span class='muted'>" +
+    esc(rec.why || "") + "</span></div>" +
+    (ai && !ai.error && ai.scene ? "<div><b>AI 看到:</b> " + esc(ai.scene) + "</div>" : "") +
+    (ai && !ai.error && ai.risks ? "<div class='muted'>风险: " + esc(ai.risks) + "</div>" : "") +
+    (ai && ai.error === "no_key" ? "<div class='muted'>未配置 API Key, 仅用程序度量</div>" : "") +
+    "</div><div style='margin-top:8px'>" + rows + "</div>";
+  box.style.display = "block";
+}
+
+$("v2_analyze").onclick = async () => {
+  if (!v2.id) { toast("先建立订单", true); return; }
+  $("v2_analyzeState").textContent = "分析中…(含 AI 约 10 秒)";
+  try {
+    const r = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: v2.id, ai: true }) });
+    const a = await r.json();
+    if (!a.ok) { $("v2_analyzeState").textContent = "分析失败"; return; }
+    v2.analysis = a; renderAnalysis(a);
+    $("v2_analyzeState").textContent = "完成";
+  } catch (e) { $("v2_analyzeState").textContent = "分析失败: " + e; }
+};
+
+function renderProps(m) {
+  const box = $("v2_props");
+  const ps = m.proposals || [];
+  if (!ps.length) { box.innerHTML = '<span class="muted">没有生成提案</span>'; return; }
+  box.innerHTML = ps.map((p) => {
+    const img = p.thumb ? "/proposal/" + v2.id + "/" + p.thumb : "";
+    return '<div class="prop" data-lang="' + p.lang + '">' +
+      (img ? '<img src="' + img + '" alt="' + esc(p.name) + '" loading="lazy" />' : "") +
+      '<div class="pb"><b>' + p.id + " · " + esc(p.name) + "</b>" +
+      '<span class="muted">' + esc(String(p.why || p.error || "").slice(0, 42)) + "</span>" +
+      '<button class="mini" data-adopt="' + p.lang + '">选它</button></div></div>';
+  }).join("");
+  box.querySelectorAll("[data-adopt]").forEach((b) => { b.onclick = () => v2Adopt(b.dataset.adopt, b); });
+}
+
+$("v2_propose").onclick = async () => {
+  if (!v2.id) { toast("先建立订单", true); return; }
+  $("v2_proposeState").textContent = "生成中…(每套约 3~5 秒)";
+  try {
+    const r = await fetch("/api/proposals", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: v2.id, n: 3 }) });
+    const m = await r.json();
+    if (!m.ok) { $("v2_proposeState").textContent = "生成失败"; return; }
+    v2.proposals = m; renderProps(m);
+    $("v2_proposeState").textContent = "已出 " + (m.proposals || []).length + " 个提案" +
+      ((m.pending || []).length ? "(待实现: " + m.pending.join(",") + ")" : "");
+  } catch (e) { $("v2_proposeState").textContent = "生成失败: " + e; }
+};
+
+async function v2Adopt(lang, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "建卡中…"; }
+  document.querySelectorAll("#v2_props .prop").forEach((el) => el.classList.toggle("on", el.dataset.lang === lang));
+  try {
+    const r = await fetch("/api/adopt", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: v2.id, lang, viewerFrom: "card-mu2o5m1y" }) });
+    const d = await r.json();
+    if (!d.ok) { toast("建卡失败, 见日志", true); if (btn) { btn.disabled = false; btn.textContent = "选它"; } return; }
+    v2.lang = lang; currentJob = v2.id;
+    $("curTitle").textContent = "V2 订单 · " + String(lang).toUpperCase();
+    $("curMeta").textContent = "已按 " + lang + " 建卡, 右侧可拖动预览";
+    $("exportBtn").disabled = false; $("openTab").disabled = false;
+    showView(v2.id, "3d");
+    await renderQA();
+    $("v2_qaCard").style.display = "block";
+    toast("已采用 " + String(lang).toUpperCase() + " 建卡");
+    poll();
+  } catch (e) { toast("建卡失败: " + e, true); if (btn) { btn.disabled = false; btn.textContent = "选它"; } }
+}
+
+async function renderQA() {
+  const ul = $("v2_qa");
+  let c = { fields: {} };
+  try { c = await (await fetch("/api/config/" + v2.id)).json(); } catch (e) {}
+  const f = c.fields || {};
+  const rows = [
+    ["Card ID", !!f.edition, f.edition || "缺失"],
+    ["纪念日期", !!f.technique, f.technique || "缺失"],
+    ["客户文案", !!f.message, f.message ? "已填" : "未填(可选)"],
+    ["背面 Identity", true, "统一背面已生成"],
+    ["二维码", !!f.qrUrl, f.qrUrl ? "已配置" : "未配置(可选)"],
+    ["设计语言", !!c.template, (c.template || "-")],
+    ["交付包", true, "点右侧「导出卡包」生成"],
+  ];
+  ul.innerHTML = rows.map((r) =>
+    "<li><span class='" + (r[1] ? "yes" : "no") + "'>" + (r[1] ? "✓" : "—") + "</span><span>" + r[0] +
+    "</span><span class='muted'>" + esc(String(r[2])) + "</span></li>").join("");
+  $("v2_qaHint").textContent = "规范 §15 QA: 以上为可自动核对的项; 视觉与文案请人工确认";
+}
+
+$("v2_order").onclick = v2Order;
+
 (async () => {                                   // 顶栏 AI 指示灯: 反映工坊进程是否配了 key
   try {
     const s = await (await fetch("/api/ai-status")).json();
@@ -809,6 +1009,7 @@ if ($("applyAdv")) $("applyAdv").onclick = applyAdvanced;
 })();
 
 syncTemplate();
+setMode('v2');
 poll();
 startPoll();
 </script>

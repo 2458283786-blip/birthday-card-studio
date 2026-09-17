@@ -159,10 +159,24 @@ def propose(photo, info=None, out_dir=None, n=3, langs=None, use_ai=False):
         lang = c["lang"]
         try:
             png, spec = design.build(photo, info, lang=lang, out_dir=out_dir)
+            # 缩略图(界面用): 512 宽 JPEG, 避免加载 2.5MB 大图
+            thumb_name = ""
+            try:
+                from PIL import Image as _Im
+                th_dir = Path(out_dir) / "thumbs"
+                th_dir.mkdir(parents=True, exist_ok=True)
+                im = _Im.open(png)
+                im.thumbnail((512, 768), _Im.Resampling.LANCZOS)
+                th = th_dir / (Path(png).stem + ".jpg")
+                im.convert("RGB").save(th, quality=86)
+                thumb_name = "thumbs/" + th.name
+            except Exception as e:
+                print("      缩略图失败:", type(e).__name__)
             props.append({
                 "id": f"{chr(65 + i)}", "lang": lang, "name": LANG_CN[lang],
                 "score": c.get("score"), "why": c.get("why"),
-                "png": png.name, "spec": {k: v for k, v in spec.items() if k != "palette"},
+                "png": png.name, "thumb": thumb_name,
+                "spec": {k: v for k, v in spec.items() if k != "palette"},
                 "palette": {k: list(v) for k, v in (spec.get("palette") or {}).items()},
             })
         except Exception as e:
