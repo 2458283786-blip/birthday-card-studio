@@ -267,6 +267,17 @@
           <button class="mini" id="v2_saveIdentity">保存身份字段并重出背面</button>
           <span class="muted" id="v2_idState"></span>
         </div>
+        <label style="margin-top:14px">交互(可关掉某一项)</label>
+        <div class="chips" id="v2_inter">
+          <div class="chip on" data-v="parallax">视差</div>
+          <div class="chip on" data-v="flip">翻转</div>
+          <div class="chip on" data-v="deviceMotion">陀螺仪</div>
+          <div class="chip on" data-v="holo">全息材质</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button class="mini" id="v2_applyInter">应用交互设置</button>
+          <span class="muted" id="v2_interState"></span>
+        </div>
         <label style="margin-top:14px">视觉参数(改完点「应用并重出卡面」)</label>
         <div class="slider"><span>围边宽度</span><input type="range" id="vd_rim" min="0" max="70" step="2"><b id="vv_rim"></b></div>
         <div class="slider"><span>围边亮度</span><input type="range" id="vd_bright" min="0" max="0.8" step="0.02"><b id="vv_bright"></b></div>
@@ -1096,6 +1107,7 @@ async function v2Adopt(lang, btn) {
     await v2ShowEdit();
     await lookLoad();
     await identityLoad();
+    await interLoad();
     toast("已采用 " + String(lang).toUpperCase() + " 建卡");
     poll();
   } catch (e) { toast("建卡失败: " + e, true); if (btn) { btn.disabled = false; btn.textContent = "选它"; } }
@@ -1380,6 +1392,43 @@ if ($("v2_saveIdentity")) $("v2_saveIdentity").onclick = async () => {
     if (f) f.dataset.id = "";
     showView(v2.id, "3d");
   } catch (e) { $("v2_idState").textContent = "失败: " + e; }
+};
+
+/* ---------------- 交互开关(多选) ---------------- */
+const VINTER = ["parallax", "flip", "deviceMotion", "holo"];
+let v2inter = { parallax: true, flip: true, deviceMotion: true, holo: true };
+function interSync() {
+  document.querySelectorAll("#v2_inter .chip").forEach(function (c) {
+    c.classList.toggle("on", !!v2inter[c.dataset.v]);
+  });
+}
+document.querySelectorAll("#v2_inter .chip").forEach(function (c) {
+  c.onclick = function () {
+    v2inter[c.dataset.v] = !v2inter[c.dataset.v];
+    interSync();
+  };
+});
+async function interLoad() {
+  try {
+    const c = await (await fetch("/api/config/" + v2.id)).json();
+    const it = c.interaction || {};
+    VINTER.forEach(function (k) { v2inter[k] = it[k] !== false; });
+    interSync();
+  } catch (e) { interSync(); }
+}
+if ($("v2_applyInter")) $("v2_applyInter").onclick = async () => {
+  if (!v2.id) { toast("先建立订单并采用提案", true); return; }
+  $("v2_interState").textContent = "应用中…";
+  try {
+    const r = await fetch("/api/config/" + v2.id, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ interaction: v2inter }) });
+    const d = await r.json().catch(function () { return {}; });
+    if (!r.ok || !d.ok) { $("v2_interState").textContent = "失败, 见日志"; return; }
+    $("v2_interState").textContent = "已应用 ✓ 重载预览中";
+    const f = $("viewer");
+    if (f) f.dataset.id = "";
+    showView(v2.id, "3d");
+  } catch (e) { $("v2_interState").textContent = "失败: " + e; }
 };
 
 $("v2_order").onclick = v2Order;

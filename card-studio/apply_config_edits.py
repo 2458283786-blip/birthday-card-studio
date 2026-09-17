@@ -21,7 +21,7 @@ EDITABLE = ["title", "subtitle", "tagline", "technique", "edition", "wish",
             "age", "name", "collection", "description", "qrUrl",
             "createdBy", "ownedBy", "occasion"]
 # 结构型改动(字典/数值), 由进阶设置面板提交
-STRUCT = ["appearance", "material", "parameters", "layout"]
+STRUCT = ["appearance", "material", "parameters", "layout", "interaction"]
 TEMPLATES = ("celebration", "soft", "pop", "night", "diorama")
 
 
@@ -80,7 +80,8 @@ def main():
             web = json.loads(web_cfg.read_text(encoding="utf8"))
             for k in ("title", "subtitle", "tagline", "technique", "edition", "wish", "age", "name",
                       "collection", "description", "qrUrl", "qr", "appearance", "material",
-                      "parameters", "layout", "backStyle"):
+                      "parameters", "layout", "backStyle",
+                      "interaction", "occasion", "createdBy", "ownedBy"):   # 查看器/背面要用的字段
                 if k in cfg:
                     web[k] = cfg[k]
             web_cfg.write_text(json.dumps(web, ensure_ascii=False, indent=2), encoding="utf8")
