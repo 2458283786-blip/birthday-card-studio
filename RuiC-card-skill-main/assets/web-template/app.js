@@ -392,6 +392,21 @@ function renderIconNode(node) {
   for (const child of children) el.appendChild(renderIconNode(child));
   return el;
 }
+function refreshIcons() {
+  const overrides = { "stroke-width": 1.5 };
+  document.querySelectorAll("[data-lucide]").forEach((el) => {
+    const name = el.getAttribute("data-lucide");
+    const tree = icons[name];
+    if (!tree) return;
+    const [tag, defaults = {}, children = []] = tree;
+    const svg = renderIconNode([tag, { ...defaults, ...overrides }, children]);
+    el.replaceChildren(svg);
+  });
+}
+
+
+// Render a lucide node tree (["svg", attrs, [children]]) into an svg element.
+
 function notice(message) {
   clearTimeout(noticeTimer);
   $("notice").textContent = message;
