@@ -110,7 +110,11 @@ def program_checks(project):
     mask = t[..., 3] > 40
     n = int(mask.sum())
     report.append({"name": "文字层", "pass": bool(n > 50), "detail": f"文字像素 {n}"})
-    if n > 50:
+    diff_layer = (n / float(mask.size)) > 0.35      # 差分回退层: 整条带都会被算进来
+    if diff_layer:
+        report.append({"name": "文字层性质", "pass": None,
+                       "detail": "该层由差分生成(含背景带), 对比度/覆盖率/贴边不适用; 请看 AI 评审"})
+    if n > 50 and not diff_layer:
         lum = a[..., 0] * 0.2126 + a[..., 1] * 0.7152 + a[..., 2] * 0.0722
         text_lum = float(lum[mask].mean())
         # 背景 = 文字掩膜膨胀后减去文字本身
@@ -159,6 +163,43 @@ def ai_review(project, front_path):
     return data
 
 
+
+def suggest_fixes(checks, ai=None):
+    """把检查结果(AI 建议 + 程序硬指标)翻成可应用的参数调整。"""
+    params, reasons = {}, []
+
+    def bump(key, delta, why, lo, hi):
+        cur = params.get(key, 0) + delta
+        params[key] = max(lo, min(hi, cur))
+        reasons.append(why)
+
+    for c in checks or []:
+        name, ok = c.get("name"), c.get("pass")
+        if ok is not False:
+            continue
+        if name == "文字对比度":
+            bump("scrim", 30, "对比度不足 → 底部暗垫 +30", 0, 255)
+        elif name == "文字覆盖率" and (c.get("value") or 0) < 1.0:
+            bump("nameSize", 12, "文字过少/偏小 → 姓名字号 +12", 40, 140)
+        elif name == "文字压人脸":
+            bump("scrim", 30, "文字压到人脸 → 底部暗垫 +30", 0, 255)
+            bump("topPad", 30, "同时顶部压暗 +30(把视觉重心压低)", 0, 180)
+
+    fixes = (ai or {}).get("fixes") or []
+    text = " ".join(str(x) for x in fixes)
+    if any(k in text for k in ("编号", "顶部", "天空")):
+        bump("topPad", 40, "AI: 编号区域需更暗 → 顶部压暗 +40", 0, 180)
+    if "日期" in text and any(k in text for k in ("小", "放大", "大")):
+        bump("dateSize", 6, "AI: 日期偏小 → 日期字号 +6", 12, 40)
+    if any(k in text for k in ("边框", "围边", "样机")):
+        bump("rimWidth", -10, "AI: 边框偏「样机感」→ 围边宽度 -10", 0, 70)
+    if any(k in text for k in ("内阴影", "层次", "质感", "纹理")):
+        bump("rimShadow", 30, "AI: 需要更多层次 → 内阴影 +30", 0, 220)
+    if any(k in text for k in ("文字", "可读", "描边", "暗部")):
+        bump("scrim", 25, "AI: 文字可读性 → 底部暗垫 +25", 0, 255)
+    return {"params": params, "reasons": reasons}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("project")
@@ -168,6 +209,7 @@ def main():
     rep = program_checks(proj)
     if a.ai and rep.get("front"):
         rep["ai"] = ai_review(proj, rep["front"])
+    rep["suggest"] = suggest_fixes(rep.get("checks"), rep.get("ai"))
     (proj / "_critic.json").write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding="utf8")
     print("[评审] 程序检查", len(rep.get("checks", [])), "项 | AI:",
           "有" if rep.get("ai") and not rep["ai"].get("error") else (rep.get("ai", {}).get("error", "无")))

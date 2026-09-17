@@ -1282,8 +1282,34 @@ if ($("v2_critic")) $("v2_critic").onclick = async () => {
     } else if (ai.error === "no_key") {
       html += "<div class='muted'>未配置 API Key: 仅显示程序硬指标</div>";
     }
+    const sg = d.suggest || {};
+    const sp = sg.params || {};
+    const keys = Object.keys(sp);
+    if (keys.length) {
+      html += "<div style='margin-top:8px'><b>可一键应用:</b> " +
+        keys.map(function (k) { return k + " " + (sp[k] > 0 ? "+" : "") + sp[k]; }).join(" · ") + "</div>";
+      html += "<div class='muted'>" + (sg.reasons || []).slice(0, 4).join(" / ") + "</div>";
+      html += "<div style='margin-top:6px'><button class='mini' id='v2_applySuggest'>一键应用这 " +
+        keys.length + " 项调整</button></div>";
+    }
     $("v2_criticBox").innerHTML = html;
     $("v2_criticBox").style.display = "block";
+    const ab = $("v2_applySuggest");
+    if (ab) ab.onclick = async function () {
+      ab.disabled = true; ab.textContent = "应用中…";
+      try {
+        const r2 = await fetch("/api/config/" + v2.id, { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appearance: sp }) });
+        const d2 = await r2.json().catch(function () { return {}; });
+        if (!r2.ok || !d2.ok) { ab.textContent = "失败, 见日志"; return; }
+        Object.keys(sp).forEach(function (k) { v2look[k] = sp[k]; });
+        lookSync();
+        ab.textContent = "已应用 ✓";
+        const f = $("viewer");
+        if (f) f.dataset.id = "";
+        showView(v2.id, "3d");
+      } catch (e) { ab.textContent = "失败: " + e; }
+    };
     $("v2_criticState").textContent = "完成";
   } catch (e) { $("v2_criticState").textContent = "评审失败: " + e; }
 };

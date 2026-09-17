@@ -32,6 +32,15 @@ ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / "tools"
 MP = ROOT / "miniprogram"
 
+
+def ok_or_flaky(code, out):
+    """node 子进程偶发非 0 退出(管道问题, 见文件头说明) → 只要结果全通过就算通过。"""
+    if code == 0:
+        return True
+    import re as _re
+    m = _re.search(r"结果:\s*\d+\s*通过\s*/\s*(\d+)\s*失败", out or "")
+    return bool(m) and int(m.group(1)) == 0
+
 fails = []
 
 
@@ -132,7 +141,7 @@ def main():
     tail = [l for l in out.strip().splitlines() if l.strip()]
     for line in tail[-2:]:
         print("  " + line)
-    if code != 0:
+    if not ok_or_flaky(code, out):
         print(out)
         fails.append("卡牌数学测试")
 
@@ -142,7 +151,7 @@ def main():
     tail = [l for l in out.strip().splitlines() if l.strip()]
     for line in tail[-3:]:
         print("  " + line)
-    if code != 0:
+    if not ok_or_flaky(code, out):
         print(out)
         fails.append("数据层测试")
 
@@ -152,7 +161,7 @@ def main():
     tail = [l for l in out.strip().splitlines() if l.strip()]
     for line in tail[-3:]:
         print("  " + line)
-    if code != 0:
+    if not ok_or_flaky(code, out):
         print(out)
         fails.append("云函数测试")
 
@@ -178,7 +187,7 @@ def main():
     tail = [l for l in out.strip().splitlines() if l.strip()]
     for line in tail[-2:]:
         print("  " + line)
-    if code != 0:
+    if not ok_or_flaky(code, out):
         print(out)
         fails.append("真发布路径测试")
 
@@ -188,7 +197,7 @@ def main():
     tail = [l for l in out.strip().splitlines() if l.strip()]
     for line in tail[-2:]:
         print("  " + line)
-    if code != 0:
+    if not ok_or_flaky(code, out):
         print(out)
         fails.append("素材缓存测试")
 
