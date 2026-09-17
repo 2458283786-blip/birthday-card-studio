@@ -257,6 +257,11 @@
       <section class="card" id="v2_qaCard" style="display:none">
         <h2><span class="n">5</span>QA 检查</h2>
         <ul class="qa" id="v2_qa"></ul>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+          <button class="mini" id="v2_critic">🔎 AI 自检(对比度/构图/层次)</button>
+          <span class="muted" id="v2_criticState"></span>
+        </div>
+        <div id="v2_criticBox" style="display:none;margin-top:8px;font-size:12.5px;line-height:1.7"></div>
         <div class="muted" id="v2_qaHint" style="margin-top:6px"></div>
       </section>
     </div>
@@ -1130,6 +1135,33 @@ async function v2ApplyLook() {
   } catch (e) { $("v2_applyState").textContent = "应用失败: " + e; }
 }
 if ($("v2_apply")) $("v2_apply").onclick = v2ApplyLook;
+if ($("v2_critic")) $("v2_critic").onclick = async () => {
+  if (!v2.id) { toast("先建立订单并采用提案", true); return; }
+  $("v2_criticState").textContent = "评审中…(含 AI 约 10 秒)";
+  try {
+    const r = await fetch("/api/critic", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: v2.id, ai: true }) });
+    const d = await r.json();
+    if (!d.ok) { $("v2_criticState").textContent = "评审失败"; return; }
+    const mark = (x) => (x ? "✓" : "✗");
+    let html = (d.checks || []).map((c) =>
+      "<div><b>" + mark(c.pass) + " " + esc(c.name) + "</b> <span class='muted'>" + esc(c.detail || "") + "</span></div>").join("");
+    const ai = d.ai || {};
+    if (ai && !ai.error) {
+      const sc = ai.scores || {};
+      html += "<div style='margin-top:6px'><b>AI 评分</b> 可读 " + (sc.readability ?? "-") +
+        " · 构图 " + (sc.composition ?? "-") + " · 层次 " + (sc.depth ?? "-") + " · 品牌 " + (sc.brand ?? "-") + "</div>";
+      if (ai.verdict) html += "<div class='muted'>总评: " + esc(ai.verdict) + "</div>";
+      (ai.issues || []).forEach((x) => { html += "<div>问题: " + esc(x) + "</div>"; });
+      (ai.fixes || []).forEach((x) => { html += "<div style='color:var(--clay)'>建议: " + esc(x) + "</div>"; });
+    } else if (ai.error === "no_key") {
+      html += "<div class='muted'>未配置 API Key: 仅显示程序硬指标</div>";
+    }
+    $("v2_criticBox").innerHTML = html;
+    $("v2_criticBox").style.display = "block";
+    $("v2_criticState").textContent = "完成";
+  } catch (e) { $("v2_criticState").textContent = "评审失败: " + e; }
+};
 if ($("v2_editText")) $("v2_editText").onclick = () => {
   if (!v2.id) { toast("先建立订单并采用提案", true); return; }
   openEditor(v2.id, $("curTitle").textContent);

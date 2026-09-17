@@ -361,6 +361,26 @@ const server = http.createServer(async (req, res) => {
         preview: "/p/" + id + "/", log: "/api/jobs/" + id + "/log" }));
     }
 
+    // ---- Visual Critic: 自动 QA 报告(V2 步骤⑤) ----
+    if (req.method === "POST" && p === "/api/critic") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const id = String(raw.id || "");
+      const dir = path.join(PROJECTS, id);
+      if (!/^card-[a-z0-9]+$/.test(id) || !existsSync(dir)) { res.writeHead(404); return res.end("no card"); }
+      const logPath = path.join(dir, "critic.log");
+      const outFile = path.join(dir, "_critic.json");
+      try { await rm(outFile, { force: true }); } catch {}
+      const args = [process.env.PY || "python", "-u", path.join(__dir, "dl2", "visual_critic.py"), dir];
+      if (raw.ai !== false && (process.env.DEEPSEEK_API_KEY || "").trim()) args.push("--ai");
+      const code = await runPy(args, ROOT, logPath, (l) => {
+        const job = jobs.get(id); if (job) job.lines.push(l);
+      });
+      let data = null;
+      try { data = JSON.parse(await readFile(outFile, "utf8")); } catch {}
+      res.writeHead(code === 0 && data ? 200 : 500, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify(data || { ok: false, error: "评审失败, 见任务日志" }));
+    }
+
     // ---- Art Director: 照片分析(V2 步骤②) ----
     if (req.method === "POST" && p === "/api/analyze") {
       const raw = JSON.parse((await body(req)).toString("utf8"));
