@@ -248,6 +248,112 @@ def main():
             print("  ❌ 超过主包上限, 需要分包")
             fails.append("体积超限")
 
+
+    # ---------------------------------------------------------------- 6) V2 生成链路回归
+    title("6. V2 生成链路(语言 / 分层 / 评审 / schema)")
+    try:
+        import importlib
+        sys.path.insert(0, str(ROOT / "card-studio"))
+        sys.path.insert(0, str(ROOT / "card-studio" / "dl2"))
+        import design
+        import art_director
+        import photodna
+        import visual_critic
+        import card_schema
+
+        # 找一张可用于测试的照片(优先小图)
+        photo = None
+        for cand in sorted((ROOT / "card-studio" / "projects").glob("card-*/_upload.png")) + \
+                    sorted((ROOT / "card-studio" / "projects").glob("card-*/assets/source.png")):
+            photo = cand
+            break
+        if photo is None:
+            print("  ⚠️  找不到测试照片(先在工作台生成一张卡), 跳过 V2 回归")
+        else:
+            # 缩到小画布跑(快) —— 只验证代码路径, 不验证观感
+            W0, H0 = design.W, design.H
+            design.W, design.H = 256, 384
+            dna, _ = photodna.analyze(photo)
+            ranked = art_director.score_languages(dna)
+            ok_rank = (len(ranked) == 5 and all(0.0 <= r["score"] <= 1.0 for r in ranked)
+                       and all(r["lang"] for r in ranked))
+            print(f"  {'✅' if ok_rank else '❌'} 语言打分: {len(ranked)} 套, 分数区间 0~1"
+                  f" | 最高 {ranked[0]['lang']}={ranked[0]['score']:.2f}")
+            if not ok_rank:
+                fails.append("V2 语言打分")
+
+            langs = ("portrait", "cyber", "editorial", "memory", "cinema")
+            bad = []
+            for lang in langs:
+                try:
+                    out, spec = design.build(str(photo), {"name": "T", "subtitle": "S",
+                                                          "edition": "CARD #0001",
+                                                          "technique": "2026.01.01"},
+                                             lang=lang, out_dir=str(ROOT / "dl2" / "out" / "_regress"))
+                    from PIL import Image as _I
+                    im = _I.open(out)
+                    if im.size[0] * 3 != im.size[1] * 2 or im.size[0] < 200:
+                        bad.append(f"{lang}(尺寸 {im.size})")
+                except Exception as e:
+                    bad.append(f"{lang}({type(e).__name__})")
+            print(f"  {'✅' if not bad else '❌'} 五套语言渲染: "
+                  f"{'全部通过' if not bad else '失败 ' + ', '.join(bad)}")
+            if bad:
+                fails.append("V2 语言渲染")
+
+            full, spec = design.build(str(photo), {"name": "T", "subtitle": "S",
+                                                   "edition": "CARD #0001",
+                                                   "technique": "2026.01.01"},
+                                      lang="portrait", out_dir=str(ROOT / "dl2" / "out" / "_regress"),
+                                      layers_dir=str(ROOT / "dl2" / "out" / "_regress" / "L"))
+            lay = sorted(f.name for f in (ROOT / "dl2" / "out" / "_regress" / "L").glob("*.png"))
+            ok_lay = all(n in lay for n in ("background.png", "subject.png", "text.png"))
+            print(f"  {'✅' if ok_lay else '❌'} PORTRAIT 分层输出: {lay}")
+            if not ok_lay:
+                fails.append("V2 分层输出")
+            design.W, design.H = W0, H0
+
+            # 评审(只跑程序侧, 不调 AI) —— 需要一个含 assets/front.png 的项目
+            target = None
+            for cand in sorted((ROOT / "card-studio" / "projects").glob("card-*")):
+                if (cand / "assets" / "front.png").exists():
+                    target = cand
+                    if (cand / "assets" / "text.png").exists():
+                        break
+            if target is None:
+                print("  ⚠️  没有含 assets/front.png 的项目, 跳过评审回归")
+            else:
+                rep = visual_critic.program_checks(target)
+                ok_rep = bool(rep.get("ok")) and len(rep.get("checks", [])) >= 3
+                print(f"  {'✅' if ok_rep else '❌'} Visual Critic 程序检查: "
+                      f"{len(rep.get('checks', []))} 项 ({target.name})")
+                if not ok_rep:
+                    fails.append("V2 评审")
+
+        # schema v2 超集
+        cj = card_schema.build_card_json(ROOT / "card-studio" / "projects" / "card-mu2o5m1y",
+                                         "CARD #0001")
+        need = ("schemaVersion", "occasion", "designLanguage", "content", "metadata", "collection")
+        miss = [k for k in need if k not in cj]
+        ok_cj = (cj.get("schemaVersion") == "2.0") and not miss and "note" in (cj.get("content") or {})
+        print(f"  {'✅' if ok_cj else '❌'} card.json v2 超集: schema={cj.get('schemaVersion')} "
+              f"{'缺 ' + ','.join(miss) if miss else '字段齐'}")
+        if not ok_cj:
+            fails.append("V2 schema")
+
+        # 服务在线时的接口冒烟(不在线不算失败)
+        try:
+            import urllib.request
+            with urllib.request.urlopen("http://127.0.0.1:4399/api/ai-status", timeout=4) as r:
+                st = json.loads(r.read().decode("utf8"))
+            print(f"  ✅ 工坊在线: AI={'已配' if st.get('available') else '未配'}(model={st.get('model')})")
+        except Exception:
+            print("  ⚠️  工坊未启动, 跳过接口冒烟(不影响结论)")
+    except Exception as e:
+        print(f"  ❌ V2 回归异常: {type(e).__name__}: {e}")
+        fails.append("V2 回归异常")
+
+    print()
     print()
     if fails:
         print("❌ 自检未通过: " + "、".join(fails))
