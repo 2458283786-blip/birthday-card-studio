@@ -573,7 +573,7 @@ def plan_portrait(im, dna, occ, info):
     }
 
 
-def edge_env_color(im, band=26):
+def edge_env_color(im, band=26, lift=0.40):
     """从照片四周取环境色(做围边/过渡用)。"""
     a = np.asarray(im.convert("RGB"), np.float32)
     h, w = a.shape[:2]
@@ -583,7 +583,7 @@ def edge_env_color(im, band=26):
     col = np.concatenate(strips, 0).mean(0)
     lum = float(col @ np.array([0.2126, 0.7152, 0.0722], np.float32))
     col = col + (lum - col) * 0.35                       # 去饱和一点
-    col = col * 0.60 + 255.0 * 0.40 * 0.94               # 提亮 → 明亮的塑封底
+    # 提亮由调用方决定(见 edge_env_color 的 lift 参数)
     return tuple(int(max(0, min(255, c))) for c in col)
 
 
@@ -606,7 +606,28 @@ def feathered_mask(w, h, feather):
 
 def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
     pal = spec["palette"]
-    RIM, FEATHER = 30, 16
+    st = spec.get("style") or {}
+
+    def g(key, default, lo=None, hi=None):
+        try:
+            v = float(st.get(key, default))
+        except (TypeError, ValueError):
+            v = float(default)
+        if lo is not None:
+            v = max(lo, v)
+        if hi is not None:
+            v = min(hi, v)
+        return v
+
+    RIM = int(g("rimWidth", 30, 0, 90))
+    FEATHER = int(g("feather", 16, 0, 60))
+    RIM_BRIGHT = g("rimBright", 0.40, 0.0, 0.85)
+    RIM_SHADOW = g("rimShadow", 120, 0, 220)
+    SCRIM = g("scrim", 214, 0, 255)
+    TOP_PAD = g("topPad", 70, 0, 180)
+    NAME_SIZE = int(g("nameSize", 96, 40, 150))
+    DATE_SIZE = int(g("dateSize", 20, 12, 40))
+    CLARITY = g("clarityPct", 26, 0, 80)
     pw, ph = W - 2 * RIM, H - 2 * RIM
 
     # ---------- 1. 照片 ----------
@@ -618,11 +639,11 @@ def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
                                                   threshold=3))
     spec["upscale"] = round(up, 2)
     spec["quality_warning"] = ("原图裁切后需放大 %.2f×, 建议换更高分辨率照片" % up) if up > 1.15 else ""
-    body = clarity(body)
+    body = clarity(body, percent=int(CLARITY)) if CLARITY > 0 else body
     body = portrait_grade(body, dna)
 
     # ---------- 2. 围边(环境色 + 竖向渐变) ----------
-    env = edge_env_color(body)
+    env = edge_env_color(body, lift=RIM_BRIGHT)
     r_top = tuple(int(min(255, c * 1.06 + 8)) for c in env)
     r_bot = tuple(int(max(0, c * 0.88)) for c in env)
     g = np.linspace(0, 1, H)[:, None, None]
@@ -641,7 +662,7 @@ def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
     inner = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     idr = ImageDraw.Draw(inner)
     for k in range(30):
-        a = int(120 * (1 - k / 30.0) ** 1.5)
+        a = int(RIM_SHADOW * (1 - k / 30.0) ** 1.5)
         off = k // 3
         idr.rectangle([RIM + k, RIM + k + off, W - RIM - 1 - k, H - RIM - 1 - k],
                       outline=(0, 0, 0, a), width=1)
@@ -649,7 +670,7 @@ def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
     top_sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     td = ImageDraw.Draw(top_sh)
     for k in range(90):
-        td.line([(RIM, RIM + k), (W - RIM, RIM + k)], fill=(0, 0, 0, int(70 * (1 - k / 90.0) ** 1.5)))
+        td.line([(RIM, RIM + k), (W - RIM, RIM + k)], fill=(0, 0, 0, int(TOP_PAD * (1 - k / 90.0) ** 1.5)))
     base.alpha_composite(top_sh.filter(ImageFilter.GaussianBlur(12)))
 
     # ---------- 5. 底部暗垫(限制在照片内, 保证文字可读) ----------
@@ -659,7 +680,7 @@ def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
     for k in range(180):
         tt = k / 179.0
         y = int(top + (H - RIM - top) * tt)
-        sd2.line([(RIM, y), (W - RIM, y)], fill=(0, 0, 0, int(4 + 214 * (tt ** 1.12))))
+        sd2.line([(RIM, y), (W - RIM, y)], fill=(0, 0, 0, int(4 + SCRIM * (tt ** 1.12))))
     for k in range(90):
         tt = k / 89.0
         sd2.line([(RIM, int(RIM + (H * 0.16) * tt)), (W - RIM, int(RIM + (H * 0.16) * tt))],
@@ -708,7 +729,7 @@ def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
         tracked(d, (W - RIM - 34 - w2, H * 0.088), spec["edition"], f, (250, 246, 238, 236), 2.6)
     x0 = RIM + 34
     if spec["name"]:
-        size = 96
+        size = NAME_SIZE
         f = fnt(spec["name"], size, "serif")
         while d.textlength(spec["name"], font=f) > W - 2 * RIM - 68 and size > 40:
             size -= 3
@@ -721,7 +742,7 @@ def render_portrait(im, dna, occ, spec, out_path=None, layers_dir=None):
         tracked(d, (x0 + 2, H * 0.872 + 2), t2, fsub, (0, 0, 0, 140), 6.4)
         tracked(d, (x0, H * 0.872), t2, fsub, soft, 6.4)
     if spec["date"]:
-        fdt = fnt(spec["date"], 20, "sans")
+        fdt = fnt(spec["date"], DATE_SIZE, "sans")
         tracked(d, (x0 + 2, H * 0.930 + 2), spec["date"], fdt, (0, 0, 0, 130), 3.2)
         tracked(d, (x0, H * 0.930), spec["date"], fdt, faint, 3.2)
     composed.alpha_composite(txt)
@@ -894,7 +915,62 @@ def render_cyber(im, dna, occ, spec, out_path=None, layers_dir=None):
     return out
 
 
-def build(photo_path, info, lang="editorial", out_dir="dl2/out", layers_dir=None):
+
+def apply_rim(img, rim=30, feather=16, bright=0.40, shadow=120, top_pad=70):
+    """通用塑封围边后处理: 把卡面内缩进一圈"明亮通透"的围边。返回 RGB 图。"""
+    import numpy as _np
+    from PIL import Image as _I, ImageDraw as _D, ImageFilter as _F
+    W2, H2 = img.size
+    rim = int(max(0, min(rim, min(W2, H2) // 5)))
+    if rim <= 0:
+        return img.convert("RGB")
+    pw, ph = W2 - 2 * rim, H2 - 2 * rim
+    src = img.convert("RGB")
+    small = src.resize((pw, ph), _I.Resampling.LANCZOS)
+    env = edge_env_color(small, band=max(6, rim), lift=bright)
+    r_top = tuple(int(min(255, c * 1.06 + 8)) for c in env)
+    r_bot = tuple(int(max(0, c * 0.88)) for c in env)
+    g = _np.linspace(0, 1, H2)[:, None, None]
+    grad = (_np.array(r_top, _np.float32)[None, None] * (1 - g) +
+            _np.array(r_bot, _np.float32)[None, None] * g)
+    grad = _np.repeat(grad[:, :1, :], W2, axis=1)
+    base = _I.fromarray(_np.clip(grad, 0, 255).astype("uint8"), "RGB").convert("RGBA")
+
+    drop = _I.new("RGBA", (W2, H2), (0, 0, 0, 0))
+    _D.Draw(drop).rectangle([rim + 7, rim + 11, W2 - rim + 7, H2 - rim + 11], fill=(0, 0, 0, 150))
+    base.alpha_composite(drop.filter(_F.GaussianBlur(16)))
+    base.paste(small, (rim, rim), feathered_mask(pw, ph, int(max(0, min(feather, 60)))))
+
+    inner = _I.new("RGBA", (W2, H2), (0, 0, 0, 0))
+    idr = _D.Draw(inner)
+    for k in range(30):
+        a = int(shadow * (1 - k / 30.0) ** 1.5)
+        idr.rectangle([rim + k, rim + k + k // 3, W2 - rim - 1 - k, H2 - rim - 1 - k],
+                      outline=(0, 0, 0, a), width=1)
+    base.alpha_composite(inner.filter(_F.GaussianBlur(8)))
+    if top_pad > 0:
+        top_sh = _I.new("RGBA", (W2, H2), (0, 0, 0, 0))
+        td = _D.Draw(top_sh)
+        for k in range(90):
+            td.line([(rim, rim + k), (W2 - rim, rim + k)],
+                    fill=(0, 0, 0, int(top_pad * (1 - k / 90.0) ** 1.5)))
+        base.alpha_composite(top_sh.filter(_F.GaussianBlur(12)))
+
+    bd = _D.Draw(base, "RGBA")
+    for k in range(6):
+        a = int(88 * (1 - k / 6.0))
+        bd.line([(2 + k, 2 + k), (W2 - 2 - k, 2 + k)], fill=(255, 255, 255, a))
+        bd.line([(2 + k, 2 + k), (2 + k, H2 - 2 - k)], fill=(255, 255, 255, a))
+    for k in range(6):
+        a = int(70 * (1 - k / 6.0))
+        bd.line([(2 + k, H2 - 3 - k), (W2 - 2 - k, H2 - 3 - k)], fill=(0, 0, 0, a))
+        bd.line([(W2 - 3 - k, 2 + k), (W2 - 3 - k, H2 - 2 - k)], fill=(0, 0, 0, a))
+    bd.rectangle([rim - 1, rim - 1, W2 - rim, H2 - rim], outline=(255, 255, 255, 128), width=1)
+    bd.rectangle([rim, rim, W2 - rim - 1, H2 - rim - 1], outline=(255, 255, 255, 74), width=1)
+    bd.rectangle([2, 2, W2 - 3, H2 - 3], outline=(255, 255, 255, 116), width=1)
+    return base.convert("RGB")
+
+def build(photo_path, info, lang="editorial", out_dir="dl2/out", layers_dir=None, style=None):
     path = Path(photo_path)
     dna, _ = photodna.analyze(path)
     im = photodna.orient.load_upright(path)
@@ -919,6 +995,7 @@ def build(photo_path, info, lang="editorial", out_dir="dl2/out", layers_dir=None
         render = render_editorial
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     out = Path(out_dir) / f"{path.stem}-{lang}.png"
+    spec["style"] = style or {}
     try:
         render(im, dna, occ, spec, out, layers_dir=layers_dir)
     except TypeError:

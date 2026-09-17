@@ -246,6 +246,21 @@
         <div class="slider"><span>背景</span><input type="range" id="v2d_bg" min="-0.8" max="0.2" step="0.02"><b id="v2v_bg"></b></div>
         <div class="slider"><span>前景</span><input type="range" id="v2d_fx" min="0" max="1.4" step="0.02"><b id="v2v_fx"></b></div>
         <div class="slider"><span>文字</span><input type="range" id="v2d_tx" min="0" max="1.2" step="0.02"><b id="v2v_tx"></b></div>
+        <label style="margin-top:14px">视觉参数(改完点「应用并重出卡面」)</label>
+        <div class="slider"><span>围边宽度</span><input type="range" id="vd_rim" min="0" max="70" step="2"><b id="vv_rim"></b></div>
+        <div class="slider"><span>围边亮度</span><input type="range" id="vd_bright" min="0" max="0.8" step="0.02"><b id="vv_bright"></b></div>
+        <div class="slider"><span>边缘羽化</span><input type="range" id="vd_feather" min="0" max="40" step="1"><b id="vv_feather"></b></div>
+        <div class="slider"><span>内阴影</span><input type="range" id="vd_shadow" min="0" max="220" step="5"><b id="vv_shadow"></b></div>
+        <div class="slider"><span>底部暗垫</span><input type="range" id="vd_scrim" min="0" max="255" step="5"><b id="vv_scrim"></b></div>
+        <div class="slider"><span>顶部压暗</span><input type="range" id="vd_top" min="0" max="180" step="5"><b id="vv_top"></b></div>
+        <div class="slider"><span>姓名字号</span><input type="range" id="vd_name" min="50" max="140" step="2"><b id="vv_name"></b></div>
+        <div class="slider"><span>日期字号</span><input type="range" id="vd_date" min="12" max="40" step="1"><b id="vv_date"></b></div>
+        <div class="slider"><span>局部对比</span><input type="range" id="vd_clarity" min="0" max="80" step="2"><b id="vv_clarity"></b></div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+          <button class="mini" id="v2_applyLook">🎛 应用并重出卡面</button>
+          <button class="mini" id="v2_resetLook">恢复默认</button>
+          <span class="muted" id="v2_lookState"></span>
+        </div>
         <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
           <button class="btn" id="v2_apply" style="height:34px;padding:0 16px;font-size:13px">应用到 3D 预览</button>
           <button class="mini" id="v2_editText">✏️ 改文案(重出卡面)</button>
@@ -1040,6 +1055,7 @@ async function v2Adopt(lang, btn) {
     await renderQA();
     $("v2_qaCard").style.display = "block";
     await v2ShowEdit();
+    await lookLoad();
     toast("已采用 " + String(lang).toUpperCase() + " 建卡");
     poll();
   } catch (e) { toast("建卡失败: " + e, true); if (btn) { btn.disabled = false; btn.textContent = "选它"; } }
@@ -1134,6 +1150,63 @@ async function v2ApplyLook() {
     showView(v2.id, "3d");
   } catch (e) { $("v2_applyState").textContent = "应用失败: " + e; }
 }
+/* ---------------- V2 视觉参数(围边/字号/暗垫) ---------------- */
+const VLOOK = {
+  rimWidth: [30, "vd_rim", "vv_rim", 0], rimBright: [0.40, "vd_bright", "vv_bright", 2],
+  feather: [16, "vd_feather", "vv_feather", 0], rimShadow: [120, "vd_shadow", "vv_shadow", 0],
+  scrim: [214, "vd_scrim", "vv_scrim", 0], topPad: [70, "vd_top", "vv_top", 0],
+  nameSize: [96, "vd_name", "vv_name", 0], dateSize: [20, "vd_date", "vv_date", 0],
+  clarityPct: [26, "vd_clarity", "vv_clarity", 0],
+};
+let v2look = {};
+Object.keys(VLOOK).forEach(function (k) { v2look[k] = VLOOK[k][0]; });
+
+function lookSync() {
+  Object.keys(VLOOK).forEach(function (k) {
+    const el = $(VLOOK[k][1]);
+    if (!el) return;
+    el.value = v2look[k];
+    $(VLOOK[k][2]).textContent = Number(v2look[k]).toFixed(VLOOK[k][3]);
+  });
+}
+Object.keys(VLOOK).forEach(function (k) {
+  const el = $(VLOOK[k][1]);
+  if (!el) return;
+  el.oninput = function () {
+    v2look[k] = parseFloat(el.value);
+    $(VLOOK[k][2]).textContent = Number(v2look[k]).toFixed(VLOOK[k][3]);
+  };
+});
+async function lookLoad() {
+  try {
+    const c = await (await fetch("/api/config/" + v2.id)).json();
+    const ap = c.appearance || {};
+    Object.keys(VLOOK).forEach(function (k) {
+      v2look[k] = ap[k] == null ? VLOOK[k][0] : ap[k];
+    });
+    lookSync();
+  } catch (e) { lookSync(); }
+}
+if ($("v2_applyLook")) $("v2_applyLook").onclick = async () => {
+  if (!v2.id) { toast("先建立订单并采用提案", true); return; }
+  $("v2_lookState").textContent = "重出卡面中…(约 5~10 秒)";
+  try {
+    const r = await fetch("/api/config/" + v2.id, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appearance: v2look }) });
+    const d = await r.json().catch(function () { return {}; });
+    if (!r.ok || !d.ok) { $("v2_lookState").textContent = "失败, 见日志"; return; }
+    $("v2_lookState").textContent = "已重出 ✓";
+    const f = $("viewer");
+    if (f) f.dataset.id = "";
+    showView(v2.id, "3d");
+    if ($("v2_criticBox")) $("v2_criticBox").style.display = "none";
+  } catch (e) { $("v2_lookState").textContent = "失败: " + e; }
+};
+if ($("v2_resetLook")) $("v2_resetLook").onclick = () => {
+  Object.keys(VLOOK).forEach(function (k) { v2look[k] = VLOOK[k][0]; });
+  lookSync();
+  $("v2_lookState").textContent = "已恢复默认(点左侧按钮应用)";
+};
 if ($("v2_apply")) $("v2_apply").onclick = v2ApplyLook;
 if ($("v2_critic")) $("v2_critic").onclick = async () => {
   if (!v2.id) { toast("先建立订单并采用提案", true); return; }

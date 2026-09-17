@@ -108,8 +108,12 @@ def main():
     is_v2 = bool(lang) or tpl == "v2"
     if is_v2:
         text_keys = {"name", "title", "subtitle", "technique", "edition", "date"}
-        if not (text_keys & set(edits.keys())):
-            print("[编辑] V2 卡: 仅外观参数变化 → 只更新配置(秒回)")
+        # 视觉参数(围边/字号/暗垫…)会改变成图 → 必须重出; 材质/景深只影响 3D → 不重出
+        look_keys = {"rimWidth", "rimBright", "feather", "rimShadow", "scrim", "topPad",
+                     "nameSize", "dateSize", "clarityPct"}
+        app_look = bool(set((edits.get("appearance") or {}).keys()) & look_keys)
+        if not (text_keys & set(edits.keys())) and not app_look:
+            print("[编辑] V2 卡: 仅材质/景深变化 → 只更新配置(秒回, 不重渲染)")
             return 0
         if not lang:
             lang = "portrait"

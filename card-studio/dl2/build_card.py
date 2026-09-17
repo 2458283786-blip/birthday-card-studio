@@ -88,9 +88,24 @@ def main():
                     pass
 
     # 1) 正面(有分层就输出分层)
+    style = cfg.get("appearance") or {}          # 视觉参数(围边/字号等)由配置决定
     front, spec = design.build(str(photo), info, lang=a.lang, out_dir=str(out_dir),
-                               layers_dir=str(out_dir))     # 分层 PNG 放项目 assets/(供导出/印刷)
+                               layers_dir=str(out_dir), style=style)   # 分层 PNG 放 assets/
     front = Path(front)
+
+    # 通用围边: 仅对"渲染器不自带围边"的语言后处理(portrait/cyber 自带 → 跳过)
+    if a.lang in ("editorial", "memory", "cinema") and float(style.get("rimWidth", 30) or 0) > 0:
+        try:
+            rimmed = design.apply_rim(
+                Image.open(front).convert("RGB"),
+                rim=int(style.get("rimWidth", 30)), feather=int(style.get("feather", 16)),
+                bright=float(style.get("rimBright", 0.40)), shadow=float(style.get("rimShadow", 120)),
+                top_pad=float(style.get("topPad", 70)))
+            rimmed.save(front)                       # 就地覆盖正面成图
+            print(f"[建卡] 已套用通用围边: 宽度 {int(style.get('rimWidth', 30))}px")
+        except Exception as e:
+            print(f"[建卡] 通用围边失败({type(e).__name__}), 保留原图")
+
     # 渲染器未产出分层(editorial/memory/cinema) → 两遍渲染差分补齐
     if not (web_assets / "background.png").exists() and not (out_dir / "background.png").exists():
         import shutil as _sh
@@ -98,7 +113,8 @@ def main():
         _sh.copy2(front, tmp_full)
         blank = {"name": "", "title": "", "subtitle": "", "edition": "",
                  "technique": "", "date": ""}
-        plain_path, _spec2 = design.build(str(photo), blank, lang=a.lang, out_dir=str(out_dir))
+        plain_path, _spec2 = design.build(str(photo), blank, lang=a.lang, out_dir=str(out_dir),
+                                          style=cfg.get("appearance") or {})
         cov = split_layers_by_diff(tmp_full, plain_path, out_dir)
         try:
             Path(plain_path).unlink(missing_ok=True)      # 第二遍渲染覆盖了同名文件
