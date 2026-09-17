@@ -23,7 +23,7 @@ import design  # noqa: E402
 import photodna  # noqa: E402
 
 # 已实现的渲染器; 规范要求的 PORTRAIT / CYBER 将在 Phase 3 补上
-RENDERERS = {"editorial": True, "memory": True, "cinema": True, "portrait": False, "cyber": False}
+RENDERERS = {"editorial": True, "memory": True, "cinema": True, "portrait": True, "cyber": False}
 LANG_CN = {"portrait": "PORTRAIT(肖像)", "cyber": "CYBER(赛博)", "editorial": "EDITORIAL(杂志)",
            "memory": "MEMORY(记忆)", "cinema": "CINEMA(电影)"}
 

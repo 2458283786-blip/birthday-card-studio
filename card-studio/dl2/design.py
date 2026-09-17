@@ -537,6 +537,114 @@ def render_memory(im, dna, occ, spec, out_path=None):
 
 
 # ---------------------------------------------------------------- CLI
+
+# ================================================================ PORTRAIT
+# 个人风格收藏卡: 照片满幅铺满, 文字压在照片上(底部), 右上角编号, 极细内框
+def portrait_grade(im, dna):
+    """克制调色: 略降饱和 + 轻提对比 + 极轻暖度 + 暗角(不改变照片本色)。"""
+    a = np.asarray(im).astype(np.float32)
+    lum = a[..., 0] * 0.2126 + a[..., 1] * 0.7152 + a[..., 2] * 0.0722
+    a = lum[..., None] + (a - lum[..., None]) * 0.92                 # 降饱和 8%
+    a = (a - 127.5) * 1.06 + 127.5                                   # 对比 +6%
+    warm = float(dna["color"].get("warmth") or 0.0)
+    if warm > 0:
+        a[..., 0] *= 1 + 0.03 * warm
+        a[..., 2] *= 1 - 0.03 * warm
+    h, w = a.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]
+    dd = np.sqrt(((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2)
+    a *= (1.0 - np.clip((dd - 0.42) / 0.95, 0, 1) ** 1.6 * 0.34)[..., None]
+    a += np.random.default_rng(11).normal(0, 1.8, a.shape)
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGB")
+
+
+def plan_portrait(im, dna, occ, info):
+    pal = palette(dna)
+    name = (info.get("name") or info.get("title") or "").strip()
+    return {
+        "id": "P1",
+        "lang": "portrait",
+        "palette": pal,
+        "name": name,
+        "subtitle": (info.get("subtitle") or "Personal Style").strip(),
+        "edition": (info.get("edition") or "").strip(),
+        "date": (info.get("technique") or info.get("date") or "").strip(),
+        "photo": subject_crop_box(im, dna, W / H),
+    }
+
+
+def render_portrait(im, dna, occ, spec, out_path=None):
+    pal = spec["palette"]
+    body = portrait_grade(im.crop(spec["photo"]).resize((W, H), Image.Resampling.LANCZOS), dna)
+    canvas = body.convert("RGBA")
+    d = ImageDraw.Draw(canvas, "RGBA")
+
+    # —— 底部光影暗垫(渐变 + 大模糊), 保证浅色字可读 ——
+    scrim = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(scrim)
+    top = int(H * 0.46)
+    steps = 180
+    for i in range(steps):
+        t = i / (steps - 1.0)
+        y = int(top + (H - top) * t)
+        sd.line([(0, y), (W, y)], fill=(0, 0, 0, int(4 + 226 * (t ** 1.10))))
+    sd.line([(0, 0), (W, 0)], fill=(0, 0, 0, 74))
+    for i in range(90):                                              # 顶部薄暗, 让编号可读
+        t = i / 89.0
+        sd.line([(0, int(H * 0.16 * t)), (W, int(H * 0.16 * t))], fill=(0, 0, 0, int(70 * (1 - t))))
+    canvas.alpha_composite(scrim.filter(ImageFilter.GaussianBlur(26)))
+
+    # —— 文字区局部暗垫(大模糊 → 看起来是光影而不是色块) ——
+    pad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    pd = ImageDraw.Draw(pad)
+    pd.rounded_rectangle([W // 20, int(H * 0.735), W - W // 20, int(H * 0.975)],
+                         radius=54, fill=(0, 0, 0, 150))
+    canvas.alpha_composite(pad.filter(ImageFilter.GaussianBlur(52)))
+
+    # —— 极细内框 ——
+    d.rectangle([W // 32, H // 48, W - 1 - W // 32, H - 1 - H // 48],
+                outline=(255, 250, 240, 52), width=1)
+
+    ink = (247, 243, 234, 255)
+    soft = (238, 232, 220, 215)
+    faint = (230, 224, 212, 176)
+    shadow = (0, 0, 0, 120)
+
+    # —— 右上: 编号 ——
+    if spec["edition"]:
+        f = fnt(spec["edition"], 34, "serif")
+        t = spec["edition"]
+        w = d.textlength(t, font=f) + 2.6 * max(0, len(t) - 1)
+        tracked(d, (W - W // 18 - w, H * 0.085), t, f, (250, 246, 238, 232), 2.6)
+
+    # —— 底部: 姓名(大衬线) + 副标题(小号大写) + 日期 ——
+    if spec["name"]:
+        size = 96
+        f = fnt(spec["name"], size, "serif")
+        while d.textlength(spec["name"], font=f) > W - 2 * (W // 12) and size > 44:
+            size -= 3
+            f = fnt(spec["name"], size, "serif")
+        d.text((W // 12 + 3, H * 0.800 + 3), spec["name"], font=f, fill=(0, 0, 0, 150))
+        d.text((W // 12, H * 0.800), spec["name"], font=f, fill=ink)
+
+    if spec["subtitle"]:
+        t = spec["subtitle"].upper()
+        fsub = fnt(t, 20, "sansb")
+        tracked(d, (W // 12 + 2, H * 0.872 + 2), t, fsub, (0, 0, 0, 140), 6.4)
+        tracked(d, (W // 12, H * 0.872), t, fsub, soft, 6.4)
+
+    if spec["date"]:
+        fdt = fnt(spec["date"], 20, "sans")
+        tracked(d, (W // 12 + 2, H * 0.930 + 2), spec["date"], fdt, (0, 0, 0, 130), 3.2)
+        tracked(d, (W // 12, H * 0.930), spec["date"], fdt, faint, 3.2)
+
+    out = canvas.convert("RGB")
+    if out_path:
+        out.save(out_path)
+        return out_path
+    return out
+
+
 def build(photo_path, info, lang="editorial", out_dir="dl2/out"):
     path = Path(photo_path)
     dna, _ = photodna.analyze(path)
@@ -548,6 +656,9 @@ def build(photo_path, info, lang="editorial", out_dir="dl2/out"):
     if lang == "cinema":
         spec = plan_cinema(im, dna, occ, info)
         render = render_cinema
+    elif lang == "portrait":
+        spec = plan_portrait(im, dna, occ, info)
+        render = render_portrait
     elif lang == "memory":
         spec = plan_memory(im, dna, occ, info)
         render = render_memory

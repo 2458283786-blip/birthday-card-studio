@@ -29,6 +29,7 @@ FONTS = r"C:\Windows\Fonts"
 SERIF = FONTS + r"\pala.ttf"
 SANS = FONTS + r"\segoeui.ttf"
 SANS_SB = FONTS + r"\seguisb.ttf"
+HAND = FONTS + r"\segoesc.ttf"     # 背面手写签名(Segoe Script 连笔)
 BLACK = FONTS + r"\bahnschrift.ttf"
 CJK = FONTS + r"\msyh.ttc"
 
@@ -281,139 +282,114 @@ def compose_front(tpl, cfg, rx, ry, foil_override):
 
 # ---------------------------------------------------------------- 背面
 def render_back(tpl, cfg):
-    S = BACK_STYLE[cfg.get("backStyle", tpl)]
-    style = cfg.get("backStyle", tpl)
+    """背面 = 统一 Card Identity(V2 规范 §6)。
+    近黑底 · 单细内框 · 居中: CARD# / 日期 / 手写签名 / 双栏归属 / 二维码
+    只画有数据的字段; 缺字段则整块不出现, 不留空白占位。
+    """
+    S = BACK_STYLE.get(cfg.get("backStyle", tpl), next(iter(BACK_STYLE.values())))
     w, h = 1024, 1536
-    g = np.linspace(0, 1, h)[:, None]
-    bg = np.zeros((h, w, 3), np.float32)
-    for i in range(3):
-        bg[..., i] = (S["bg1"][i] / 255.0) * (1 - g) + (S["bg2"][i] / 255.0) * g
-    im = Image.fromarray((bg * 255).astype(np.uint8), "RGB").convert("RGBA")
-    d = ImageDraw.Draw(im)
-    if style == "pop":
-        d.rectangle([0, 1330, w, h], fill=S["a1"] + (255,))
-        d.rectangle([0, 0, w, 46], fill=S["gold"] + (255,))
-        d.rectangle([740, 46, w, 64], fill=S["a2"] + (255,))
-    elif style == "celebration":
-        lay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        ImageDraw.Draw(lay).ellipse([-240, -210, 620, 650], fill=S["a2"] + (120,))
-        lay = lay.filter(ImageFilter.GaussianBlur(150))
-        im.alpha_composite(lay)
-        lay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        ImageDraw.Draw(lay).ellipse([450, 820, 1300, 1670], fill=S["a1"] + (95,))
-        im.alpha_composite(lay.filter(ImageFilter.GaussianBlur(150)))
-    elif style in ("night", "diorama"):
-        lay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        ld = ImageDraw.Draw(lay)
-        rng = np.random.default_rng(3)
-        for i in range(150):
-            y = int(rng.random() * h)
-            x0 = int(rng.random() * 600)
-            ld.line([(x0, y), (x0 + int(rng.random() * 400) + 40, y)],
-                    fill=(143, 162, 196, 14) if i % 2 else (201, 177, 132, 14), width=1)
-        im.alpha_composite(lay)
-        d.ellipse([512 - 300, 760 - 300, 512 + 300, 760 + 300], outline=S["gold"] + (18,), width=1)
-    # 边框
-    if S["frame"] == "bold":
-        d.rectangle([26, 26, w - 27, h - 27], outline=S["ink"] + (255,), width=4)
-    elif S["frame"] == "thin":
-        d.rectangle([30, 30, w - 31, h - 31], outline=(58, 52, 44, 215), width=2)
-        _star(d, 62, 62, 8, S["a1"] + (230,)); _star(d, w - 62, h - 62, 8, S["a2"] + (240,))
-    else:
-        d.rectangle([38, 38, w - 39, h - 39], outline=S["gold"] + (205,), width=2)
-        d.rectangle([56, 56, w - 57, h - 57], outline=S["gold"] + (130,), width=1)
-        for (x, y) in [(86, 86), (w - 86, 86), (86, h - 86), (w - 86, h - 86)]:
-            _star(d, x, y, 7, S["gold"] + (200,))
-    # 背面 = 卡牌身份证: 只用最少的字段(简约), 全部自动适配宽度, 绝不超出内框
-    ink, gold = S["ink"] + (255,), S["gold"] + (255,)
-    fam = BLACK if style == "pop" else SERIF
-    SAFE_W = 780                      # 内框安全宽度(左右各留边)
-    qr_cfg = cfg.get("qr") or {}
-    has_qr = bool(qr_cfg.get("enabled") and qr_cfg.get("matrix"))
-    text_w = 560 if has_qr else SAFE_W       # 有二维码时收窄正文, 避免相撞
+    gold = tuple(S.get("gold", (222, 201, 160)))
+    ink_c = tuple(S.get("ink", (236, 232, 224)))
+    base_rgb = tuple(S.get("bg2", (12, 13, 17)))
 
-    def fit(text, kind, size, max_w, tracking=0.0, min_size=13):
-        """字号自适应 + 按内容切中文字体(ftext), 仍放不下就截断。"""
+    # —— 底: 近黑 + 极轻的模板色偏移 + 柔和暗角 + 细颗粒(印刷感) ——
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+    d = ImageDraw.Draw(im)
+    dark = tuple(max(6, min(34, int(c * 0.16 + 8))) for c in base_rgb)
+    for y in range(h):
+        t = y / h
+        f_ = 1.0 - 0.22 * abs(t - 0.45) * 2
+        d.line([(0, y), (w, y)], fill=tuple(int(c * f_) for c in dark) + (255,))
+    try:
+        import numpy as np
+        arr = np.asarray(im.convert("RGB"), dtype=np.float32)
+        yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+        r = np.sqrt(((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2)
+        arr *= np.clip(1.06 - 0.30 * np.clip(r - 0.35, 0, 2) ** 1.5, 0.55, 1.06)[..., None]
+        rng = np.random.default_rng(7)
+        arr += rng.normal(0, 1.6, arr.shape).astype(np.float32)
+        im = Image.fromarray(np.clip(arr, 0, 255).astype("uint8"), "RGB").convert("RGBA")
+        d = ImageDraw.Draw(im)
+    except Exception:
+        pass
+
+    # —— 单细内框 + 四角短线(克制) ——
+    m = 34
+    d.rectangle([m, m, w - 1 - m, h - 1 - m], outline=gold + (58,), width=1)
+    for (x, y, sx, sy) in [(m, m, 1, 1), (w - 1 - m, m, -1, 1),
+                           (m, h - 1 - m, 1, -1), (w - 1 - m, h - 1 - m, -1, -1)]:
+        d.line([(x, y), (x + sx * 34, y)], fill=gold + (96,), width=1)
+        d.line([(x, y), (x, y + sy * 34)], fill=gold + (96,), width=1)
+
+    # —— 工具: 自适应字号 + 超宽截断 ——
+    def fit(text, kind, size, max_w, tracking=0.0, min_size=12):
         t = str(text)
-        s = size
-        while s > min_size:
-            fnt = ftext(t, s, kind)
+        sz = size
+        while sz > min_size:
+            fnt = ftext(t, sz, kind)
             if d.textlength(t, font=fnt) + tracking * max(0, len(t) - 1) <= max_w:
                 return fnt, t
-            s -= 1
+            sz -= 1
         fnt = ftext(t, min_size, kind)
-        while len(t) > 3 and d.textlength(t + "…", font=fnt) + tracking * len(t) > max_w:
+        while len(t) > 3 and d.textlength(t + "\u2026", font=fnt) + tracking * len(t) > max_w:
             t = t[:-1]
-        return fnt, (t + "…" if t != str(text) else t)
+        return fnt, (t + "\u2026" if t != str(text) else t)
 
-    # ① 身份: CARD #
+    # —— 上半: CARD # + 细线 + 日期(居中) ——
+    y = int(h * 0.175)
     if cfg.get("edition"):
-        fnt, t = fit(cfg["edition"], "sans", 20, 520, 2.4)
-        tracked(d, (512, 312), t, fnt, gold, 2.4, True)
-    d.line([(432, 348), (592, 348)], fill=S["ink"] + (80,), width=1)
-
-    # ② 年龄水印(纯装饰)
-    age = str(cfg.get("age") or "").strip()
-    if age:
-        wm = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        col = {"night": (222, 201, 160, 22), "diorama": (232, 201, 138, 24),
-               "pop": (20, 20, 20, 18),
-               "celebration": (232, 121, 106, 30), "soft": (216, 195, 160, 56)}[style]
-        ImageDraw.Draw(wm).text((512, 880), age, font=f(fam, 320 if style != "pop" else 300),
-                                fill=col, anchor="ms")
-        im.alpha_composite(wm)
-    d = ImageDraw.Draw(im)
-    # 背面不放标题(标题属于正面; 且卡名可能是文件名字符串)
-    _star(d, 512, 940, 5, S["ink"] + (140,))
-    d.line([(392, 940), (486, 940)], fill=S["ink"] + (70,), width=1)
-    d.line([(538, 940), (632, 940)], fill=S["ink"] + (70,), width=1)
-
-    # ③ 凭证区(只保留 4 行以内): 名字 / 日期 / 祝福 / 归属(合并一行)
-    d.line([(372, 1104), (652, 1104)], fill=S["ink"] + (60,), width=1)
-    if cfg.get("name"):
-        fnt, t = fit(str(cfg["name"]).upper(), "sansb", 17, text_w, 3.4)
-        tracked(d, (512, 1148), t, fnt, ink, 3.4, True)
+        fnt, t = fit(cfg["edition"], "serif", 38, 620, 3.4)
+        tracked(d, (w / 2, y), t, fnt, gold + (246,), 3.4, True)
+    y += 46
+    d.line([(w / 2 - 92, y), (w / 2 + 92, y)], fill=gold + (70,), width=1)
     if cfg.get("technique"):
-        fnt, t = fit(cfg["technique"], "sans", 23, text_w, 2.0)
-        tracked(d, (512, 1204), t, fnt, gold, 2.0, True)
-    if cfg.get("wish"):
-        fnt, t = fit(cfg["wish"], "serif", 21, text_w, 0.6)
-        tracked(d, (512, 1256), t, fnt, S["ink"] + (190,), 0.6, True)
-    owners = " · ".join(x for x in [("CREATED BY " + str(cfg["createdBy"]).upper()) if cfg.get("createdBy") else "",
-                                    ("OWNED BY " + str(cfg["ownedBy"]).upper()) if cfg.get("ownedBy") else ""] if x)
-    if owners:
-        fnt, t = fit(owners, "sans", 13, text_w, 2.6)
-        tracked(d, (512, 1320), t, fnt, S["ink"] + (150,), 2.6, True)
+        fnt, t = fit(cfg["technique"], "sans", 21, 560, 2.6)
+        tracked(d, (w / 2, y + 34), t, fnt, ink_c + (196,), 2.6, True)
 
-    # ④ 二维码(可选): 低右角, 与正文互不重叠
+    # —— 中部: 手写签名(系列名/固定语) ——
+    script = str(cfg.get("collection") or "Digital Collectible Card").strip()
+    if script.isupper():
+        script = " ".join(w.capitalize() for w in script.split())
+    if script:
+        hf = HAND if Path(HAND).exists() else SERIF
+        sz = 74 if len(script) <= 24 else 58
+        fnt = f(hf, sz)
+        while d.textlength(script, font=fnt) > 660 and sz > 30:
+            sz -= 2
+            fnt = f(hf, sz)
+        d.text((w / 2 + 2, h * 0.50 + 2), script, font=fnt, fill=(0, 0, 0, 130), anchor="mm")
+        d.text((w / 2, h * 0.50), script, font=fnt, fill=gold + (222,), anchor="mm")
+
+    # —— 细线 + 左右双栏归属 ——
+    d.line([(w / 2 - 150, h * 0.625), (w / 2 + 150, h * 0.625)], fill=gold + (52,), width=1)
+    created = str(cfg.get("createdBy") or "").strip().lstrip("@")
+    owned = str(cfg.get("ownedBy") or "").strip().lstrip("@")
+    if created or owned:
+        col_w = 340
+        if created:
+            fnt, t = fit("Created by @" + created, "sans", 16, col_w, 2.2)
+            tracked(d, (w * 0.28, h * 0.665), t, fnt, ink_c + (176,), 2.2, True)
+        if owned:
+            fnt, t = fit("Owned by @" + owned, "sans", 16, col_w, 2.2)
+            tracked(d, (w * 0.72, h * 0.665), t, fnt, ink_c + (176,), 2.2, True)
+
+    # —— 底部: 居中二维码(可选) ——
     qr = cfg.get("qr") or {}
     if qr.get("enabled") and qr.get("matrix"):
-        m = qr["matrix"]
-        n = len(m)
-        box, pad = 118, 10
-        x0 = w - 92 - box
-        y0 = h - 92 - box
-        tile = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        td = ImageDraw.Draw(tile)
-        td.rounded_rectangle([x0 - pad, y0 - pad, x0 + box + pad, y0 + box + pad], radius=12,
-                             fill=(250, 247, 240, 242) if style in ("night", "diorama", "pop")
-                             else (255, 253, 249, 246))
-        im.alpha_composite(tile)
-        cell = box / n
-        dqr = ImageDraw.Draw(im)
-        dark = (13, 17, 28, 255) if style in ("night", "diorama") else (36, 31, 25, 255)
-        for r in range(n):
-            row = str(m[r])
-            for c in range(n):
-                if row[c] == "1":
-                    dqr.rectangle([x0 + c * cell, y0 + r * cell,
-                                   x0 + (c + 1) * cell - 0.4, y0 + (r + 1) * cell - 0.4], fill=dark)
-        d2 = ImageDraw.Draw(im)
-        tracked(d2, (x0 + box / 2, y0 + box + pad + 24), "SCAN", f(SANS, 12),
-                S["gold"] + (170,) if style in ("night", "diorama") else S["ink"] + (140,), 3.0, True)
-    return im.convert("RGB")
-
-
+        mat = qr["matrix"]
+        n = len(mat)
+        side, pad = 164, 12
+        x0, y0 = int(w / 2 - side / 2), int(h * 0.735)
+        d.rounded_rectangle([x0 - pad, y0 - pad, x0 + side + pad, y0 + side + pad], radius=10,
+                            fill=(255, 255, 255, 238))
+        cell = side / float(n)
+        for r_i, row in enumerate(mat):
+            for c_i, v in enumerate(row):
+                if v:
+                    d.rectangle([x0 + c_i * cell, y0 + r_i * cell,
+                                 x0 + (c_i + 1) * cell, y0 + (r_i + 1) * cell],
+                                fill=(12, 12, 14, 255))
+    return im
 def _star(d, cx, cy, r, fill, ratio=0.22):
     d.polygon([(cx, cy - r), (cx + r * ratio, cy - r * ratio), (cx + r, cy),
                (cx + r * ratio, cy + r * ratio), (cx, cy + r),
