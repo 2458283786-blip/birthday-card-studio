@@ -186,7 +186,7 @@
           <span class="muted">JPG / PNG / WebP · 透明底或纯色底的抠图也能用</span>
         </div>
       </div>
-      <input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
       <div id="preview"><img id="thumb" alt="预览" /><div><b id="fname"></b><br /><span class="muted" id="fsize"></span></div></div>
     </section>
 
@@ -202,6 +202,7 @@
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
           <button class="btn" id="v2_order" style="height:34px;padding:0 16px;font-size:13px">建立订单</button>
           <span class="muted" id="v2_orderState">先放入照片</span>
+          <button class="btn clay" id="v2_batch" style="height:34px;padding:0 16px;font-size:13px;display:none">批量出卡(自动选语言)</button>
         </div>
         <div class="muted" style="margin-top:8px">Card ID 由系统自动生成(规范 §5: 禁止手工填写)<br>顺序: ① 建立订单 → ② AI 分析 → ③ 生成提案 → 点「选它」建卡</div>
       </section>
@@ -521,12 +522,21 @@ function load(blob, name) {
   toast("图片已就绪, 可以生成卡片");
 }
 drop.onclick = () => file.click();
-file.onchange = () => { if (file.files[0]) load(file.files[0], file.files[0].name); };
+file.onchange = () => {
+  if (!file.files.length) return;
+  load(file.files[0], file.files[0].name);
+  if (file.files.length > 1) addPending(file.files);
+};
 ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => {
   e.preventDefault(); drop.classList.add("hot"); }));
 ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => {
   e.preventDefault(); drop.classList.remove("hot"); }));
-drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) load(f, f.name); });
+drop.addEventListener("drop", (e) => {
+  const fs = e.dataTransfer.files;
+  if (!fs || !fs.length) return;
+  load(fs[0], fs[0].name);            // 第一张走单张流程(带预览)
+  if (fs.length > 1) addPending(fs);  // 其余入队
+});
 document.addEventListener("paste", (e) => {
   const it = [...((e.clipboardData && e.clipboardData.items) || [])].find((i) => i.type.startsWith("image/"));
   if (it) load(it.getAsFile(), "粘贴的图片");
@@ -580,6 +590,13 @@ async function poll() {
   $("histCount").textContent = done.length;
   renderHistory(list);
   if ($("libGrid") && $("libGrid").classList.contains("open")) renderLibrary();
+  const batchIds = (window.__batchIds || []);
+  if (batchIds.length) {
+    const fin = batchIds.filter((id) => { const j = list.find((x) => x.id === id);
+      return j && (j.status === "done" || j.status === "error"); }).length;
+    if ($("v2_orderState")) $("v2_orderState").textContent = "批量处理中: " + fin + "/" + batchIds.length + " 完成";
+    if (fin === batchIds.length) { window.__batchIds = []; toast("批量出卡完成(" + batchIds.length + " 张)"); }
+  }
   const me = currentJob ? list.find((j) => j.id === currentJob) : null;
   const active = list.filter((j) => j.status === "running" || j.status === "queued").pop();
   const watch = me || active;
@@ -1268,6 +1285,42 @@ function toggleLibrary() {
 }
 if ($("libBtn")) $("libBtn").onclick = toggleLibrary;
 
+
+/* ---------------- 多图排队 ---------------- */
+let pending = [];                       // 待出卡的文件
+function renderPending() {
+  const btn = $("v2_batch");
+  if (!btn) return;
+  btn.style.display = pending.length > 1 ? "" : "none";
+  btn.textContent = "批量出卡(自动选语言 · " + pending.length + " 张)";
+  if (pending.length > 1) $("v2_orderState").textContent = "已入队 " + pending.length + " 张(可单张建单, 也可批量)";
+}
+function addPending(files) {
+  Array.from(files || []).forEach(function (f) {
+    if (f && f.type && f.type.indexOf("image/") === 0) pending.push(f);
+  });
+  renderPending();
+}
+$("v2_batch").onclick = async function () {
+  if (pending.length < 2) { toast("至少放入两张照片", true); return; }
+  const btn = $("v2_batch");
+  btn.disabled = true; btn.textContent = "提交中…";
+  try {
+    const imgs = [];
+    for (const f of pending) imgs.push(await blobToDataURL(f));
+    const r = await fetch("/api/batch", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ images: imgs, name: val("v2_name"), date: val("v2_date"),
+                             message: val("v2_msg"), note: val("v2_note"), occasion: "personal" }) });
+    const d = await r.json();
+    if (!r.ok || !d.ok) { toast("批量提交失败", true); return; }
+    window.__batchIds = d.ids || [];
+    toast("已入队 " + d.count + " 张, 正在顺序处理(可在卡片库看进度)");
+    $("v2_orderState").textContent = "批量处理中: 0/" + d.count + " 完成";
+    pending = []; renderPending();
+    poll();
+  } catch (e) { toast("批量提交失败: " + e, true); }
+  finally { btn.disabled = false; }
+};
 
 $("v2_order").onclick = v2Order;
 

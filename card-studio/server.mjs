@@ -338,6 +338,99 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ ok: true, id, edition }));
     }
 
+    // ---- V2 批量出卡: 多图排队(顺序处理) ----
+    if (req.method === "POST" && p === "/api/batch") {
+      const raw = JSON.parse((await body(req)).toString("utf8"));
+      const imgs = Array.isArray(raw.images) ? raw.images.slice(0, 24) : [];
+      if (!imgs.length) { res.writeHead(400); return res.end("no images"); }
+      // 找一个带查看器的项目, 供 build_card 复制 index.html/style.css/bundle
+      let viewerFrom = null;
+      for (const d of await readdir(PROJECTS)) {
+        if (existsSync(path.join(PROJECTS, d, "web", "index.html"))) { viewerFrom = d; break; }
+      }
+      const ids = [];
+      let seq = (await readdir(PROJECTS)).filter((x) => x.startsWith("card-")).length;
+      for (const dataUrl of imgs) {
+        const m = /^data:image\/[a-zA-Z]+;base64,(.+)$/.exec(String(dataUrl || ""));
+        if (!m) continue;
+        const id = "card-" + Date.now().toString(36) + Math.floor(Math.random() * 900 + 100).toString(36);
+        const dir = path.join(PROJECTS, id);
+        await mkdir(path.join(dir, "assets"), { recursive: true });
+        await mkdir(path.join(dir, "web", "assets"), { recursive: true });
+        await writeFile(path.join(dir, "_upload.png"), Buffer.from(m[1], "base64"));
+        seq += 1;
+        const edition = "CARD #" + String(seq).padStart(4, "0");
+        const cfg = {
+          schemaVersion: "1.0", occasion: String(raw.occasion || "personal"), designLanguage: "",
+          title: "", subtitle: "Personal Style", edition,
+          technique: String(raw.date || "").trim(), name: String(raw.name || "").trim(),
+          message: String(raw.message || "").trim(), note: String(raw.note || "").trim(),
+          collection: "Digital Collectible", backStyle: "night",
+          appearance: { finish: "gold", background: "#efece6" },
+          material: { regions: { frame: "gloss", text: "gloss", subject: "matte", background: "matte" },
+                      amounts: { frame: .85, text: .55, subject: 0, background: 0 } },
+          parameters: { subjectDepth: .10, backgroundDepth: -.22, effectsDepth: .78, textDepth: .46,
+                        foil: .6, motionStrength: .8 },
+          interaction: { parallax: true, flip: true, holo: true, deviceMotion: true },
+        };
+        const j = JSON.stringify(cfg, null, 2);
+        await writeFile(path.join(dir, "card-config.json"), j, "utf8");
+        await writeFile(path.join(dir, "web", "card-config.json"), j, "utf8");
+        const meta = { title: cfg.name || "未命名", edition, technique: cfg.technique,
+                       template: "v2", designLanguage: "", note: cfg.note };
+        await writeFile(path.join(dir, "meta.json"), JSON.stringify(meta, null, 2), "utf8");
+        jobs.set(id, { id, dir, image: path.join(dir, "_upload.png"), style: "ink", mode: "auto",
+                       meta, template: "v2", status: "queued",
+                       lines: ["[批量] 已入队, 等待处理…"],
+                       created: new Date().toLocaleString("zh-CN", { hour12: false }),
+                       preview: "/p/" + id + "/" });
+        ids.push(id);
+      }
+      // 后台顺序处理(不阻塞响应)
+      (async () => {
+        const py = process.env.PY || "python";
+        for (const id of ids) {
+          const dir = path.join(PROJECTS, id);
+          const job = jobs.get(id);
+          if (!job) continue;
+          const push = (l) => job.lines.push(l);
+          const logPath = path.join(dir, "batch.log");
+          job.status = "running";
+          push("[批量] 开始处理…");
+          try {
+            await runPy([py, "-u", path.join(__dir, "dl2", "art_director.py"), dir,
+                         "--analyze-only", "--out", path.join(dir, "_analyze")], ROOT, logPath, push);
+            let lang = "portrait";
+            try {
+              const a = JSON.parse(await readFile(path.join(dir, "_analyze", "_analyze.json"), "utf8"));
+              lang = (a.recommended && a.recommended.lang) || lang;
+              push("[批量] 推荐语言: " + lang);
+            } catch {}
+            await runPy([py, "-u", path.join(__dir, "dl2", "art_director.py"), dir,
+                         "--out", path.join(dir, "proposals"), "--n", "3"], ROOT, logPath, push);
+            const args = [py, "-u", path.join(__dir, "dl2", "build_card.py"), dir, "--lang", lang];
+            if (viewerFrom) args.push("--viewer-from", viewerFrom);
+            const code = await runPy(args, ROOT, logPath, push);
+            if (code === 0 && existsSync(path.join(dir, "static.png"))) {
+              job.status = "done";
+              job.template = lang;
+              job.meta.designLanguage = lang;
+              push("[批量] 完成 ✓ 语言 " + lang);
+            } else {
+              job.status = "error";
+              push("[批量] 建卡失败(见上方日志)");
+            }
+          } catch (e) {
+            job.status = "error";
+            push("[批量] 异常: " + e.message);
+          }
+        }
+        await restoreHistory();
+      })();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ok: true, ids, count: ids.length }));
+    }
+
     // ---- V2 采用提案: 按选定语言把订单做成卡(正面+分层+背面+静态图) ----
     if (req.method === "POST" && p === "/api/adopt") {
       const raw = JSON.parse((await body(req)).toString("utf8"));
