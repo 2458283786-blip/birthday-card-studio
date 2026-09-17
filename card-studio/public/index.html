@@ -193,16 +193,16 @@
           <div class="full"><label>备注(仅内部)</label><input id="v2_note" placeholder="工作台内部备注" /></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
-          <button class="btn" id="v2_order" style="height:34px;padding:0 16px;font-size:13px" disabled>建立订单</button>
+          <button class="btn" id="v2_order" style="height:34px;padding:0 16px;font-size:13px">建立订单</button>
           <span class="muted" id="v2_orderState">先放入照片</span>
         </div>
-        <div class="muted" style="margin-top:8px">Card ID 由系统自动生成(规范 §5: 禁止手工填写)</div>
+        <div class="muted" style="margin-top:8px">Card ID 由系统自动生成(规范 §5: 禁止手工填写)<br>顺序: ① 建立订单 → ② AI 分析 → ③ 生成提案 → 点「选它」建卡</div>
       </section>
 
       <section class="card">
         <h2><span class="n">2</span>AI 设计分析</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="mini" id="v2_analyze" disabled>🔍 让 AI 看这张照片</button>
+          <button class="mini" id="v2_analyze">🔍 让 AI 看这张照片</button>
           <span class="muted" id="v2_analyzeState"></span>
         </div>
         <div id="v2_analysis" style="display:none;margin-top:10px"></div>
@@ -211,7 +211,7 @@
       <section class="card">
         <h2><span class="n">3</span>设计提案</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="mini" id="v2_propose" disabled>🎨 生成 3 个提案</button>
+          <button class="mini" id="v2_propose">🎨 生成 3 个提案</button>
           <span class="muted" id="v2_proposeState"></span>
         </div>
         <div id="v2_props" class="props"></div>
@@ -703,6 +703,14 @@ async function saveEditor() {
 $("editCancel").onclick = () => $("editDialog").close();
 $("editSave").onclick = saveEditor;
 $("aiBtn").onclick = () => {
+  // V2 模式: AI = 照片分析(步骤②)
+  if (uiMode === "v2") {
+    if (!v2.id) { toast("先填①客户内容并点「建立订单」, AI 才能看到照片", true); return; }
+    $("v2_analyze").click();
+    const box = $("v2_analysis");
+    if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   const openPanel = () => {
     const d = $("advPanel");
     d.closest("details").open = true;
@@ -891,7 +899,8 @@ async function v2Order() {
     $("v2_analyze").disabled = false; $("v2_propose").disabled = false;
     $("v2_analysis").style.display = "none"; $("v2_props").innerHTML = "";
     $("v2_qaCard").style.display = "none";
-    toast("订单已建立:" + d.edition);
+    toast("订单已建立:" + d.edition + ", 正在让 AI 看照片…");
+    $("v2_analyze").click();
     poll();
   } catch (e) { $("v2_orderState").textContent = "建立失败: " + e; }
 }
