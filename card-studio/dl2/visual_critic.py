@@ -37,6 +37,58 @@ def find(project, names):
     return None
 
 
+
+def face_overlap_check(project, text_path, full_bleed=True):
+    """文字是否压到人脸: 人脸框按全幅裁切映射到卡面, 与文字掩膜求交。"""
+    try:
+        import photodna
+        import design
+        from PIL import Image as _I
+        import numpy as _np
+        src = None
+        for pat in ("_upload.*", "assets/source.png", "source.png"):
+            hits = sorted(Path(project).glob(pat))
+            if hits:
+                src = hits[0]
+                break
+        if src is None or not text_path:
+            return None
+        dna, _ = photodna.analyze(src)
+        faces = (dna.get("subject") or {}).get("faces") or []
+        if not faces:
+            return {"name": "文字压人脸", "pass": True, "detail": "未检测到可用人脸"}
+        im = photodna.orient.load_upright(src)
+        deg = dna["orientation"]["applied_deg"]
+        if deg:
+            im = im.rotate(-deg, expand=True)
+        box = design.subject_crop_box(im, dna, design.W / design.H)   # 与渲染器同一套裁切
+        bx, by, bx2, by2 = box
+        sx = design.W / float(max(1, bx2 - bx))
+        sy = design.H / float(max(1, by2 - by))
+        tl = _I.open(text_path).convert("RGBA")
+        mask = _np.asarray(tl)[..., 3] > 40
+        tot = int(mask.sum())
+        if tot < 50:
+            return None
+        hit = 0
+        for (fx, fy, fw, fh) in faces:
+            x0 = int((fx - bx) * sx)
+            y0 = int((fy - by) * sy)
+            x1 = int((fx + fw - bx) * sx)
+            y1 = int((fy + fh - by) * sy)
+            x0, y0 = max(0, x0), max(0, y0)
+            x1, y1 = min(design.W, x1), min(design.H, y1)
+            if x1 > x0 and y1 > y0:
+                hit += int(mask[y0:y1, x0:x1].sum())
+        ratio = hit / float(tot)
+        note = "" if full_bleed else "(非全幅版式, 近似)"
+        return {"name": "文字压人脸", "pass": bool(ratio < 0.05), "value": round(ratio * 100, 1),
+                "detail": f"文字与人脸重叠 {ratio * 100:.1f}%{note}" +
+                          ("" if ratio < 0.05 else " —— 建议上移/侧移文字或加暗垫")}
+    except Exception as e:
+        return {"name": "文字压人脸", "pass": None, "detail": f"跳过({type(e).__name__})"}
+
+
 def program_checks(project):
     front_p = find(project, ["front.png", "static.png"])
     text_p = find(project, ["text.png"])
@@ -79,6 +131,9 @@ def program_checks(project):
         edge = min(xs.min(), ys.min(), w - 1 - xs.max(), h - 1 - ys.max())
         report.append({"name": "文字贴边", "pass": bool(edge >= int(w * 0.02)), "value": int(edge),
                        "detail": f"距最近边缘 {edge}px" + ("" if edge >= w * 0.02 else "(过近, 建议留白)")})
+    fo = face_overlap_check(project, text_p)
+    if fo:
+        report.append(fo)
     out.update({"ok": True, "checks": report, "front": str(front_p)})
     return out
 
